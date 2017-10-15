@@ -26,7 +26,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/opennota/widdly/store"
+	"../store"
 )
 
 var (
@@ -46,8 +46,11 @@ var (
 )
 
 func init() {
-	http.HandleFunc("/", withLoggingAndAuth(index))
+//	http.HandleFunc("/", withLoggingAndAuth(index))
+	http.HandleFunc("/", withLogging(index))
 	http.HandleFunc("/status", withLoggingAndAuth(status))
+//	http.HandleFunc("/challenge/tiddlywebplugins.tiddlyspace.cookie_form", login) // POST
+//	http.HandleFunc("/logout", withLoggingAndAuth(logout)) // POST
 	http.HandleFunc("/recipes/all/tiddlers.json", withLoggingAndAuth(list))
 	http.HandleFunc("/recipes/all/tiddlers/", withLoggingAndAuth(tiddler))
 	http.HandleFunc("/bags/bag/tiddlers/", withLoggingAndAuth(remove))
@@ -133,7 +136,16 @@ func status(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"username":"me","space":{"recipe":"all"}}`))
+
+	var ret []byte
+
+	if !isAuth(r) {
+		ret = []byte(`{"username":"GUEST","space":{"recipe":"all"}}`)
+	} else {
+		ret = []byte(`{"username":"me","space":{"recipe":"all"}}`)
+	}
+
+	w.Write(ret)
 }
 
 // list serves a JSON list of (mostly) skinny tiddlers.

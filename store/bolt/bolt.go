@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/boltdb/bolt"
+	"../../bolt"
 
-	"github.com/opennota/widdly/store"
+	"../../store"
 )
 
 // boltStore is a BoltDB store for tiddlers.

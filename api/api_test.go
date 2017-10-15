@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/opennota/widdly/store"
+	"../store"
 )
 
 type testStore struct {

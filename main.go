@@ -15,28 +15,26 @@
 package main
 
 import (
-	"bytes"
-	"compress/flate"
+//	"bytes"
+//	"compress/flate"
 	"crypto/subtle"
 	"flag"
-	"io/ioutil"
+//	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
+//	"strconv"
+//	"strings"
+//	"time"
 
-	"golang.org/x/crypto/bcrypt"
+//	"golang.org/x/crypto/bcrypt"
 
-	"github.com/daaku/go.zipexe"
-	"github.com/gorilla/securecookie"
-	"github.com/kardianos/osext"
+//	"github.com/gorilla/securecookie"
 
-	"github.com/opennota/widdly/api"
-	"github.com/opennota/widdly/store"
-	_ "github.com/opennota/widdly/store/bolt"
+	"./api"
+	"./store"
+	_ "./store/bolt"
 )
 
 var (
@@ -44,8 +42,8 @@ var (
 	password   = flag.String("p", "", "Optional password to protect the wiki (the username is widdly)")
 	dataSource = flag.String("db", "widdly.db", "Database file")
 
-	hashKey      = securecookie.GenerateRandomKey(64)
-	secureCookie = securecookie.New(hashKey, nil)
+//	hashKey      = securecookie.GenerateRandomKey(64)
+//	secureCookie = securecookie.New(hashKey, nil)
 )
 
 func main() {
@@ -54,25 +52,17 @@ func main() {
 	// Open the data store and tell HTTP handlers to use it.
 	api.Store = store.MustOpen(*dataSource)
 
-	// Maybe read index.html from a zip archive appended to the current executable.
-	wikiData := tryReadWikiFromExecutable()
-
 	// Override api.ServeIndex to allow serving embedded index.html.
 	wiki := pathToWiki()
 	api.ServeIndex = func(w http.ResponseWriter, r *http.Request) {
 		if fi, err := os.Stat(wiki); err == nil && isRegular(fi) { // Prefer the real file, if it exists.
 			http.ServeFile(w, r, wiki)
-		} else if len(wikiData) > 0 { // ...or use an embedded one.
-			w.Header().Add("Content-Type", "text/html")
-			w.Header().Add("Content-Encoding", "deflate")
-			w.Header().Add("Content-Length", strconv.Itoa(len(wikiData)))
-			w.Write(wikiData)
 		} else {
 			http.NotFound(w, r)
 		}
 	}
 
-	// Optionally protect by a password.
+/*	// Optionally protect by a password.
 	if *password != "" {
 		// Select an appropriate bcrypt cost.
 		bcryptCost := bcrypt.DefaultCost
@@ -100,6 +90,15 @@ func main() {
 				w.WriteHeader(http.StatusUnauthorized)
 			}
 		}
+	}*/
+
+	api.Authenticate = func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || subtle.ConstantTimeCompare([]byte(pass), []byte("test")) != 1 ||
+			subtle.ConstantTimeCompare([]byte(user), []byte("admin")) != 1 { // DON'T use subtle.ConstantTimeCompare like this!
+			w.Header().Add("Www-Authenticate", `Basic realm="Who are you?"`)
+			w.WriteHeader(http.StatusUnauthorized)
+		}
 	}
 
 	log.Fatal(http.ListenAndServe(*addr, nil))
@@ -111,7 +110,7 @@ func main() {
 // it falls back to searching in the current directory.
 func pathToWiki() string {
 	dir := ""
-	path, err := osext.Executable() //TODO(opennota): switch to the new os.Executable() once Go 1.8 is out.
+	path, err := os.Executable()
 	if err == nil {
 		dir = filepath.Dir(path)
 	} else if wd, err := os.Getwd(); err == nil {
@@ -125,65 +124,5 @@ func isRegular(fi os.FileInfo) bool {
 	return fi.Mode()&os.ModeType == 0
 }
 
-// deflate compresses data and returns the compressed slice.
-func deflate(data []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	w, _ := flate.NewWriter(&buf, flate.BestCompression)
-	_, err := w.Write(data)
-	if err != nil {
-		return nil, err
-	}
-	err = w.Close()
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
 
-// tryReadWikiFromExecutable tries to read index.html from a zip archive appended to the current executable.
-// If it succeeds, it returns deflate-compressed index.html. If it fails, it returns nil.
-func tryReadWikiFromExecutable() []byte {
-	path, err := osext.Executable()
-	if err != nil {
-		return nil
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		return nil
-	}
-	r, err := zipexe.NewReader(f, fi.Size())
-	if err != nil {
-		return nil
-	}
-	for _, zf := range r.File {
-		// Get the first .html file.
-		if !strings.HasSuffix(zf.Name, ".html") {
-			continue
-		}
 
-		// Read the archived index.html. Could use zf.DataOffset() and zf.CompressedSize64
-		// and avoid the unnecessary decompression and compression steps,
-		// but zipexe does not provide zip file offset relative to the executable.
-		rc, err := zf.Open()
-		if err != nil {
-			return nil
-		}
-		defer rc.Close()
-		data, err := ioutil.ReadAll(rc)
-		if err != nil {
-			return nil
-		}
-		compressed, err := deflate(data)
-		if err != nil {
-			return nil
-		}
-		return compressed
-	}
-
-	return nil
-}
