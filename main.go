@@ -34,7 +34,10 @@ import (
 
 	"./api"
 	"./store"
-	_ "./store/bolt"
+//	_ "./store/bolt"
+//	_ "./store/sqlite"
+	_ "./store/flatFile"
+
 )
 
 var (

@@ -139,11 +139,11 @@ func status(w http.ResponseWriter, r *http.Request) {
 
 	var ret []byte
 
-	if !isAuth(r) {
-		ret = []byte(`{"username":"GUEST","space":{"recipe":"all"}}`)
-	} else {
+	//if !isAuth(r) {
+	//	ret = []byte(`{"username":"GUEST","space":{"recipe":"all"}}`)
+	//} else {
 		ret = []byte(`{"username":"me","space":{"recipe":"all"}}`)
-	}
+	//}
 
 	w.Write(ret)
 }
