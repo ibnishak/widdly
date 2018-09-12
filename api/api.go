@@ -45,15 +45,15 @@ var (
 	}
 )
 
-func init() {
-//	http.HandleFunc("/", withLoggingAndAuth(index))
-	http.HandleFunc("/", withLogging(index))
-	http.HandleFunc("/status", withLoggingAndAuth(status))
-//	http.HandleFunc("/challenge/tiddlywebplugins.tiddlyspace.cookie_form", login) // POST
-//	http.HandleFunc("/logout", withLoggingAndAuth(logout)) // POST
-	http.HandleFunc("/recipes/all/tiddlers.json", withLoggingAndAuth(list))
-	http.HandleFunc("/recipes/all/tiddlers/", withLoggingAndAuth(tiddler))
-	http.HandleFunc("/bags/bag/tiddlers/", withLoggingAndAuth(remove))
+func InitHandle(mux *Mux) {
+//	mux.HandleFunc("/", withLoggingAndAuth(index))
+	mux.HandleFunc("/", withLogging(index))
+	mux.HandleFunc("/status", withLoggingAndAuth(status))
+//	mux.HandleFunc("/challenge/tiddlywebplugins.tiddlyspace.cookie_form", login) // POST
+//	mux.HandleFunc("/logout", withLoggingAndAuth(logout)) // POST
+	mux.HandleFunc("/recipes/all/tiddlers.json", withLoggingAndAuth(list))
+	mux.HandleFunc("/recipes/all/tiddlers/", withLoggingAndAuth(tiddler))
+	mux.HandleFunc("/bags/bag/tiddlers/", withLoggingAndAuth(remove))
 }
 
 // internalError logs err to the standard error and returns HTTP 500 Internal Server Error.
@@ -117,10 +117,32 @@ func withLoggingAndAuth(f http.HandlerFunc) http.HandlerFunc {
 
 // index serves the index page.
 func index(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	switch r.Method {
+	case "HEAD":
+		return
+	case "OPTIONS":
+		w.Header().Add("Allow", "GET, HEAD, PUT, OPTIONS")
+		w.Header().Add("DAV", "1, 2") // hack for WebDAV sync adaptor/saver
+		return
+	case "PUT":
+		// TODO: check auth
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+		err = ioutil.WriteFile("index.html", b, 0644)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+		return
+	default:
+	}
+	/*if r.Method != "GET" {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
-	}
+	}*/
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
@@ -140,9 +162,9 @@ func status(w http.ResponseWriter, r *http.Request) {
 	var ret []byte
 
 	//if !isAuth(r) {
-	//	ret = []byte(`{"username":"GUEST","space":{"recipe":"all"}}`)
+		ret = []byte(`{"username":"GUEST","space":{"recipe":"all"}}`)
 	//} else {
-		ret = []byte(`{"username":"me","space":{"recipe":"all"}}`)
+	//	ret = []byte(`{"username":"me","space":{"recipe":"all"}}`)
 	//}
 
 	w.Write(ret)

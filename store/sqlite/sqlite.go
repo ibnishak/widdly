@@ -22,7 +22,7 @@ import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/opennota/widdly/store"
+	"../../store"
 )
 
 // sqliteStore is a sqliteDB store for tiddlers.

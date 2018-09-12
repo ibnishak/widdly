@@ -172,7 +172,7 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 	rev := getLastRevision(s, tiddler.Key)
 	data, _ := json.Marshal(js)
 
-	// TODO: check error & tiddler.Key == '$:/ControlPanel'
+	// TODO: check error & tiddler.Key == '$:/StoryList'
 	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, tiddler.Key + ".tid"), []byte(tiddler.Text), 0644)
 	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, tiddler.Key + ".meta"), tiddler.Meta, 0644)
 	err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", tiddler.Key, rev)), data, 0644)

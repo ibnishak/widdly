@@ -16,8 +16,7 @@ package main
 
 import (
 //	"bytes"
-//	"compress/flate"
-	"crypto/subtle"
+//	"crypto/subtle"
 	"flag"
 //	"io/ioutil"
 	"log"
@@ -28,9 +27,6 @@ import (
 //	"strings"
 //	"time"
 
-//	"golang.org/x/crypto/bcrypt"
-
-//	"github.com/gorilla/securecookie"
 
 	"./api"
 	"./store"
@@ -44,18 +40,18 @@ var (
 	addr       = flag.String("http", "127.0.0.1:8080", "HTTP service address")
 	password   = flag.String("p", "", "Optional password to protect the wiki (the username is widdly)")
 	dataSource = flag.String("db", "widdly.db", "Database file")
-
-//	hashKey      = securecookie.GenerateRandomKey(64)
-//	secureCookie = securecookie.New(hashKey, nil)
 )
 
 func main() {
 	flag.Parse()
 
+	mux := api.NewRootMux()
+	api.InitHandle(mux)
+
 	// Open the data store and tell HTTP handlers to use it.
 	api.Store = store.MustOpen(*dataSource)
 
-	// Override api.ServeIndex to allow serving embedded index.html.
+	/*// Override api.ServeIndex to allow serving embedded index.html.
 	wiki := pathToWiki()
 	api.ServeIndex = func(w http.ResponseWriter, r *http.Request) {
 		if fi, err := os.Stat(wiki); err == nil && isRegular(fi) { // Prefer the real file, if it exists.
@@ -63,48 +59,18 @@ func main() {
 		} else {
 			http.NotFound(w, r)
 		}
-	}
-
-/*	// Optionally protect by a password.
-	if *password != "" {
-		// Select an appropriate bcrypt cost.
-		bcryptCost := bcrypt.DefaultCost
-		for cost := bcrypt.MinCost + 1; cost <= bcrypt.MaxCost; cost++ {
-			start := time.Now()
-			if _, err := bcrypt.GenerateFromPassword([]byte("qwerty"), cost); err != nil {
-				log.Fatal(err)
-			}
-			if time.Since(start) > time.Second {
-				bcryptCost = cost - 1
-				break
-			}
-		}
-
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(*password), bcryptCost)
-		if err != nil {
-			log.Fatal(err)
-		}
-		// Set api.Authenticate and provide a login handler for simple password authentication.
-		api.Authenticate = func(w http.ResponseWriter, r *http.Request) {
-			user, pass, ok := r.BasicAuth()
-			if !ok || bcrypt.CompareHashAndPassword(hashedPassword, []byte(pass)) != nil ||
-				subtle.ConstantTimeCompare([]byte(user), []byte("widdly")) != 1 { // DON'T use subtle.ConstantTimeCompare like this!
-				w.Header().Add("Www-Authenticate", `Basic realm="Who are you?"`)
-				w.WriteHeader(http.StatusUnauthorized)
-			}
-		}
 	}*/
 
-	api.Authenticate = func(w http.ResponseWriter, r *http.Request) {
+	/*api.Authenticate = func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if !ok || subtle.ConstantTimeCompare([]byte(pass), []byte("test")) != 1 ||
 			subtle.ConstantTimeCompare([]byte(user), []byte("admin")) != 1 { // DON'T use subtle.ConstantTimeCompare like this!
 			w.Header().Add("Www-Authenticate", `Basic realm="Who are you?"`)
 			w.WriteHeader(http.StatusUnauthorized)
 		}
-	}
+	}*/
 
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
 // pathToWiki returns a path that should be checked for index.html.
