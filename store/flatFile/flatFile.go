@@ -172,16 +172,11 @@ func getLastRevision(s *flatFileStore, key string) int {
 // The tiddler is also written to the tiddler_history bucket.
 func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error) {
 	var err error
-	// TODO: system key in one file
-	//if strings.HasPrefix(tiddler.Key, "$:/") {
-	//	return 0, nil
-	//}
 
+	sys := strings.HasPrefix(tiddler.Key, "$:/") // system key
 	key := key2File(tiddler.Key)
 	rev := getLastRevision(s, key)
 
-
-	// TODO: check error & tiddler.Key == '$:/StoryList'
 	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".tid"), []byte(tiddler.Text), 0644)
 	if err != nil {
 		return 0, err
@@ -191,9 +186,10 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 		return 0, err
 	}
 
-	// skip Draft history
-	if !tiddler.IsDraft {
+	// skip Draft & system history
+	if !tiddler.IsDraft && !sys {
 		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, rev)), tiddler.Meta, 0644)
+		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d.tid", key, rev)), []byte(tiddler.Text), 0644)
 	}
 
 	return rev, nil
