@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"context"
 	"strings"
-	"encoding/json"
+//	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -85,9 +85,22 @@ func MustOpen(dataSource string) store.TiddlerStore {
 	return &flatFileStore{storePath, tiddlersPath, tiddlerHistoryPath}
 }
 
+func key2File(key string) string {
+	illegalChar := `<>:"/\|?*^`
+	mapFn := func(r rune) rune {
+		if strings.ContainsRune(illegalChar, r) {
+			return '_'
+		} else {
+			return r
+		}
+	}
+	return strings.Map(mapFn, key)
+}
+
 // Get retrieves a tiddler from the store by key (title).
 func (s *flatFileStore) Get(_ context.Context, key string) (store.Tiddler, error) {
 	t := store.Tiddler{WithText: true}
+	key = key2File(key)
 	tiddlerPath := filepath.Join(s.tiddlersPath, key + ".tid")
 	tiddlerMetaPath := filepath.Join(s.tiddlersPath, key + ".meta")
 	if _, err := os.Stat(tiddlerPath); os.IsNotExist(err) {
@@ -106,12 +119,6 @@ func (s *flatFileStore) Get(_ context.Context, key string) (store.Tiddler, error
 		t.Text = string(tiddler)
 	}
 	return t, nil
-}
-
-func copyOf(p []byte) []byte {
-	q := make([]byte, len(p))
-	copy(q, p)
-	return q
 }
 
 // All retrieves all the tiddlers (mostly skinny) from the store.
@@ -164,24 +171,37 @@ func getLastRevision(s *flatFileStore, key string) int {
 // Put saves tiddler to the store, incrementing and returning revision.
 // The tiddler is also written to the tiddler_history bucket.
 func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error) {
-	var js map[string]interface{}
-	err := json.Unmarshal(tiddler.Meta, &js)
+	var err error
+	// TODO: system key in one file
+	//if strings.HasPrefix(tiddler.Key, "$:/") {
+	//	return 0, nil
+	//}
+
+	key := key2File(tiddler.Key)
+	rev := getLastRevision(s, key)
+
+
+	// TODO: check error & tiddler.Key == '$:/StoryList'
+	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".tid"), []byte(tiddler.Text), 0644)
 	if err != nil {
 		return 0, err
 	}
-	rev := getLastRevision(s, tiddler.Key)
-	data, _ := json.Marshal(js)
+	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".meta"), tiddler.Meta, 0644)
+	if err != nil {
+		return 0, err
+	}
 
-	// TODO: check error & tiddler.Key == '$:/StoryList'
-	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, tiddler.Key + ".tid"), []byte(tiddler.Text), 0644)
-	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, tiddler.Key + ".meta"), tiddler.Meta, 0644)
-	err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", tiddler.Key, rev)), data, 0644)
+	// skip Draft history
+	if !tiddler.IsDraft {
+		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, rev)), tiddler.Meta, 0644)
+	}
 
 	return rev, nil
 }
 
 // Delete deletes a tiddler with the given key (title) from the store.
 func (s *flatFileStore) Delete(ctx context.Context, key string) error {
+	key = key2File(key)
 	err := os.Remove(filepath.Join(s.tiddlersPath, key + ".tid"))
 	if err != nil {
 		return err

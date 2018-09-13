@@ -228,10 +228,19 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//fmt.Println("[D]", js)
+
+	isDraft := false
+	fields, ok := js["fields"].(map[string]interface{})
+	if ok {
+		_, isDraft = fields["draft.of"]
+	}
+
 	rev, err := Store.Put(r.Context(), store.Tiddler{
 		Key:  key,
 		Meta: meta,
 		Text: text,
+		IsDraft: isDraft,
 	})
 	if err != nil {
 		internalError(w, err)

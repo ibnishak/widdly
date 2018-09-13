@@ -29,6 +29,7 @@ type Tiddler struct {
 	Meta     []byte // Meta information (the tiddler serialized to JSON without text)
 	Text     string // The text of the tiddler
 	WithText bool   // If the tiddler is non-skinny (should be serialized with its text).
+	IsDraft  bool   // check Draft
 }
 
 // MarshalJSON implements json.Marshaler
