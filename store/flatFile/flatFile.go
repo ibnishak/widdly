@@ -175,7 +175,9 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 
 	sys := strings.HasPrefix(tiddler.Key, "$:/") // system key
 	key := key2File(tiddler.Key)
-	rev := getLastRevision(s, key)
+	//rev := getLastRevision(s, key)
+	//tiddler.Revision = rev
+	rev := tiddler.Revision
 
 	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".tid"), []byte(tiddler.Text), 0644)
 	if err != nil {
@@ -188,8 +190,12 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 
 	// skip Draft & system history
 	if !tiddler.IsDraft && !sys {
-		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, rev)), tiddler.Meta, 0644)
-		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d.tid", key, rev)), []byte(tiddler.Text), 0644)
+		tiddler.SetRev = true
+		data, err := tiddler.MarshalJSON()
+		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, rev)), data, 0644)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	return rev, nil

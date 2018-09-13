@@ -28,6 +28,8 @@ type Tiddler struct {
 	Key      string // The title of the tiddler
 	Meta     []byte // Meta information (the tiddler serialized to JSON without text)
 	Text     string // The text of the tiddler
+	SetRev   bool   // set Rev to Meta
+	Revision int    // The revision of the tiddler held at the server
 	WithText bool   // If the tiddler is non-skinny (should be serialized with its text).
 	IsDraft  bool   // check Draft
 }
@@ -35,7 +37,7 @@ type Tiddler struct {
 // MarshalJSON implements json.Marshaler
 // If t is skinny (t.WithText is false), it returns t.Meta (not its copy).
 func (t *Tiddler) MarshalJSON() ([]byte, error) {
-	if !t.WithText {
+	if !t.WithText && !t.SetRev {
 		return t.Meta, nil
 	}
 
@@ -46,6 +48,12 @@ func (t *Tiddler) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	js["text"] = t.Text
+
+	if t.SetRev {
+		// put 'revision' back
+		js["revision"] = t.Revision
+	}
+
 	return json.Marshal(js)
 }
 

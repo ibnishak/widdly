@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"strconv"
 
 	"../store"
 )
@@ -217,8 +218,16 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 	}
 	io.Copy(ioutil.Discard, r.Body)
 
-	js["bag"] = "bag"
+	//fmt.Println("[D5]", js, js["revision"])
 
+	js["bag"] = "bag"
+	var rev int
+	revstr, ok := js["revision"].(string)
+	if ok {
+		rev64, _ := strconv.ParseInt(revstr, 10, 64)
+		rev = int(rev64)
+	}
+	js["revision"] = fmt.Sprintf("%d", rev + 1)
 	text, _ := js["text"].(string)
 	delete(js, "text")
 
@@ -228,7 +237,7 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//fmt.Println("[D]", js)
+	//fmt.Println("[D6]", js, rev)
 
 	isDraft := false
 	fields, ok := js["fields"].(map[string]interface{})
@@ -236,10 +245,11 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 		_, isDraft = fields["draft.of"]
 	}
 
-	rev, err := Store.Put(r.Context(), store.Tiddler{
+	rev, err = Store.Put(r.Context(), store.Tiddler{
 		Key:  key,
 		Meta: meta,
 		Text: text,
+		Revision: rev + 1,
 		IsDraft: isDraft,
 	})
 	if err != nil {
