@@ -47,6 +47,10 @@ required, so that index.html talks back to the server for content.
 The process for preparing a new index.html is:
 
 - Open tiddlywiki-5.1.17.html in your web browser.
+- `$:/plugins/tiddlywiki/tiddlyweb/save/offline` ~~`$:/config/SaverFilter`~~
+  - save openlist: `[all[]] -[[$:/HistoryList]] -[[$:/StoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
+  - no openlist: `[all[]] -[[$:/HistoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
+
 - Click the control panel (gear) icon.
 - Click the Plugins tab.
 - Click "Get more plugins".
