@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"io/ioutil"
 	"regexp"
-//	"strconv"
 
 	"../../store"
 )
@@ -120,11 +119,6 @@ func (s *flatFileStore) Get(_ context.Context, key string) (*store.Tiddler, erro
 		}
 	}
 
-	/*tiddler, err := ioutil.ReadFile(tiddlerPath)
-	if err != nil {
-		return nil, err
-	}*/
-
 	return store.NewTiddler(meta, tiddler)
 }
 
@@ -149,22 +143,22 @@ func (s *flatFileStore) All(_ context.Context) ([]*store.Tiddler, error) {
 
 func getLastRevision(s *flatFileStore, key string) int {
 	key = key2File(key)
-	highestRev := 0
+	rev := 1 // start with 1
 
 	tiddlerMetaPath := filepath.Join(s.tiddlersPath, key + ".meta")
 	if _, err := os.Stat(tiddlerMetaPath); os.IsNotExist(err) {
-		return 0
+		return rev
 	}else {
 		meta, err := ioutil.ReadFile(tiddlerMetaPath)
 		if err != nil {
-			return 0
+			return rev
 		}
 
 		t, _ := store.NewTiddler(meta, nil)
-		highestRev = t.GetRevision() + 1
+		rev = t.GetRevision() + 1
 	}
 
-	return highestRev
+	return rev
 }
 
 // Put saves tiddler to the store, incrementing and returning revision.
@@ -176,6 +170,7 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 	rev := getLastRevision(s, key)
 	tiddler.Js["revision"] = rev
 
+	// skip system history, only save meta & data to single file
 	if tiddler.IsSys {
 		meta, err := tiddler.MarshalJSON()
 		if err != nil {
@@ -186,15 +181,15 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 		if err != nil {
 			return 0, err
 		}
-		return 0, nil
+		return rev, nil
 	}
 
-	// skip Draft & system history
-	if !tiddler.IsDraft && !tiddler.IsSys {
+	// skip Draft history
+	if !tiddler.IsDraft {
 		data, err := tiddler.MarshalJSON()
 		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, rev)), data, 0644)
 		if err != nil {
-			return 0, err
+			return rev, err
 		}
 	}
 

@@ -225,28 +225,7 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 	}
 //	io.Copy(ioutil.Discard, r.Body)
 
-	//fmt.Println("[D5]", js, js["revision"])
-
 	js["bag"] = "bag"
-	/*var rev int
-	revstr, ok := js["revision"].(string)
-	if ok {
-		rev64, _ := strconv.ParseInt(revstr, 10, 64)
-		rev = int(rev64)
-	}
-	js["revision"] = fmt.Sprintf("%d", rev + 1)
-	text, _ := js["text"].(string)
-	delete(js, "text")*/
-
-	/*var rev int
-	withRev := false
-	revstr, ok := js["revision"].(string)
-	if ok {
-		rev64, _ := strconv.ParseInt(revstr, 10, 64)
-		rev = int(rev64)
-	}*/
-
-	//text, withText := js["text"].(string)
 
 	isSys := strings.HasPrefix(key, "$:/")
 	isDraft := false
@@ -257,8 +236,6 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 
 	rev, err := Store.Put(r.Context(), store.Tiddler{
 		//Meta: buf,
-		//Text: text,
-		//WithText: withText,
 
 		Key:  key,
 		IsDraft: isDraft,
