@@ -81,11 +81,6 @@ func (s *boltStore) Get(_ context.Context, key string) (*store.Tiddler, error) {
 	return store.NewTiddler(meta, tiddler)
 }
 
-func copyOf(p []byte) []byte {
-	q := make([]byte, len(p), len(p))
-	copy(q, p)
-	return q
-}
 
 // All retrieves all the tiddlers (mostly skinny) from the store.
 // Special tiddlers (like global macros) are returned fat.
@@ -101,13 +96,12 @@ func (s *boltStore) All(_ context.Context) ([]*store.Tiddler, error) {
 			}
 
 			var tiddler []byte
-			metabuf := copyOf(meta)
 			_, text := c.Next()
-			if bytes.Contains(metabuf, []byte(`"$:/tags/Macro"`)) {
+			if bytes.Contains(meta, []byte(`"$:/tags/Macro"`)) {
 				tiddler = []byte(text)
 			}
 
-			t, _ := store.NewTiddler(metabuf, tiddler)
+			t, _ := store.NewTiddler(meta, tiddler)
 			tiddlers = append(tiddlers, t)
 		}
 		return nil
