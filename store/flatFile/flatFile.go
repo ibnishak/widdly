@@ -155,7 +155,7 @@ func getLastRevision(s *flatFileStore, key string) int {
 		}
 
 		t, _ := store.NewTiddler(meta, nil)
-		rev = t.GetRevision() + 1
+		rev = t.GetRevision()
 	}
 
 	return rev
@@ -167,12 +167,12 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 	var err error
 	key := key2File(tiddler.Key)
 
-	rev := getLastRevision(s, key)
+	rev := getLastRevision(s, key) + 1
 	tiddler.Js["revision"] = rev
 
 	// skip system history, only save meta & data to single file
 	if tiddler.IsSys {
-		meta, err := tiddler.MarshalJSON()
+		meta, err := tiddler.MarshalJSON() // meta with text & rev
 		if err != nil {
 			return 0, err
 		}
@@ -195,7 +195,7 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 
 	text, _ := tiddler.Js["text"].(string)
 	delete(tiddler.Js, "text")
-	meta, err := json.Marshal(tiddler.Js)
+	meta, err := json.Marshal(tiddler.Js) // meta without text
 	if err != nil {
 		return 0, err
 	}

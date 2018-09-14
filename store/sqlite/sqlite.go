@@ -53,31 +53,28 @@ func MustOpen(dataSource string) store.TiddlerStore {
 }
 
 // Get retrieves a tiddler from the store by key (title).
-func (s *sqliteStore) Get(_ context.Context, key string) (store.Tiddler, error) {
-	t := store.Tiddler{WithText: true}
+func (s *sqliteStore) Get(_ context.Context, key string) (*store.Tiddler, error) {
 	getStmt, err := s.db.Prepare(`SELECT meta, content FROM tiddler WHERE title = ? ORDER BY revision DESC LIMIT 1`)
 	var meta string
 	var content string
 	err = getStmt.QueryRow(key).Scan(&meta, &content)
 	if err != nil {
-		return store.Tiddler{}, err
+		return nil, err
 	}
-	t.Meta = make([]byte, len(meta))
-	copy(t.Meta, meta)
-	t.Text = string(content)
-	return t, nil
+	return store.NewTiddler(meta, content)
 }
 
 func copyOf(p []byte) []byte {
-	q := make([]byte, len(p))
+	q := make([]byte, len(p), len(p))
 	copy(q, p)
 	return q
 }
 
 // All retrieves all the tiddlers (mostly skinny) from the store.
 // Special tiddlers (like global macros) are returned fat.
-func (s *sqliteStore) All(_ context.Context) ([]store.Tiddler, error) {
+func (s *sqliteStore) All(_ context.Context) ([]*store.Tiddler, error) {
 	tiddlers := []store.Tiddler{}
+	tiddlers := make([]*store.Tiddler, 0)
 	rows, err := s.db.Query(`SELECT meta, content FROM tiddler`)
 	defer rows.Close()
 	for rows.Next() {
@@ -85,14 +82,17 @@ func (s *sqliteStore) All(_ context.Context) ([]store.Tiddler, error) {
 		var meta string
 		var content string
 		if err := rows.Scan(&meta, &content); err != nil {
-                return nil, err
-        }
-        t.Meta = []byte(meta)
-        if bytes.Contains(t.Meta, []byte(`"$:/tags/Macro"`)) {
-			t.Text = string(content)
-			t.WithText = true
+		        return nil, err
 		}
-        tiddlers = append(tiddlers, t)
+
+		var tiddler []byte
+		metabuf = []byte(meta)
+		if bytes.Contains(metabuf, []byte(`"$:/tags/Macro"`)) {
+			tiddler = []byte(content)
+		}
+
+		t, _ := store.NewTiddler(metabuf, tiddler)
+		tiddlers = append(tiddlers, t)
 	}
 	if err != nil {
 		return nil, err
@@ -113,17 +113,20 @@ func getLastRevision(db *sql.DB, mkey string) int {
 // Put saves tiddler to the store, incrementing and returning revision.
 // The tiddler is also written to the tiddler_history bucket.
 func (s *sqliteStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error) {
-	var js map[string]interface{}
-	err := json.Unmarshal(tiddler.Meta, &js)
-	if err != nil {
-		return 0, err
-	}
 	rev := getLastRevision(s.db, tiddler.Key)
 	insertStmt, err := s.db.Prepare(`INSERT INTO tiddler(title, meta, content, revision) VALUES (?, ?, ?, ?)`)
 	if err != nil {
 		return 0, err
 	}
-	_, err = insertStmt.Exec(tiddler.Key, tiddler.Meta, tiddler.Text, rev+1)
+
+	text, _ := tiddler.Js["text"].(string)
+	delete(tiddler.Js, "text")
+	meta, err := json.Marshal(tiddler.Js)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = insertStmt.Exec(tiddler.Key, meta, text, rev+1)
 	if err != nil {
 		return 0, err
 	}

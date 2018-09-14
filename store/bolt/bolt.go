@@ -63,35 +63,34 @@ func MustOpen(dataSource string) store.TiddlerStore {
 }
 
 // Get retrieves a tiddler from the store by key (title).
-func (s *boltStore) Get(_ context.Context, key string) (store.Tiddler, error) {
-	t := store.Tiddler{WithText: true}
+func (s *boltStore) Get(_ context.Context, key string) (*store.Tiddler, error) {
+	var meta []byte
+	var tiddler []byte
 	err := s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tiddler"))
-		meta := b.Get([]byte(key + "|1"))
+		meta = b.Get([]byte(key + "|1"))
 		if meta == nil {
 			return store.ErrNotFound
 		}
-		t.Meta = make([]byte, len(meta))
-		copy(t.Meta, meta)
-		t.Text = string(b.Get([]byte(key + "|2")))
+		tiddler = b.Get([]byte(key + "|2"))
 		return nil
 	})
 	if err != nil {
-		return store.Tiddler{}, err
+		return nil, err
 	}
-	return t, nil
+	return store.NewTiddler(meta, tiddler)
 }
 
 func copyOf(p []byte) []byte {
-	q := make([]byte, len(p))
+	q := make([]byte, len(p), len(p))
 	copy(q, p)
 	return q
 }
 
 // All retrieves all the tiddlers (mostly skinny) from the store.
 // Special tiddlers (like global macros) are returned fat.
-func (s *boltStore) All(_ context.Context) ([]store.Tiddler, error) {
-	tiddlers := []store.Tiddler{}
+func (s *boltStore) All(_ context.Context) ([]*store.Tiddler, error) {
+	tiddlers := make([]*store.Tiddler, 0)
 	err := s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tiddler"))
 		c := b.Cursor()
@@ -100,13 +99,15 @@ func (s *boltStore) All(_ context.Context) ([]store.Tiddler, error) {
 				c.Next()
 				continue
 			}
-			var t store.Tiddler
-			t.Meta = copyOf(meta)
+
+			var tiddler []byte
+			metabuf := copyOf(meta)
 			_, text := c.Next()
-			if bytes.Contains(t.Meta, []byte(`"$:/tags/Macro"`)) {
-				t.Text = string(text)
-				t.WithText = true
+			if bytes.Contains(metabuf, []byte(`"$:/tags/Macro"`)) {
+				tiddler = []byte(text)
 			}
+
+			t, _ := store.NewTiddler(metabuf, tiddler)
 			tiddlers = append(tiddlers, t)
 		}
 		return nil
@@ -129,37 +130,35 @@ func getLastRevision(b *bolt.Bucket, mkey []byte) int {
 // Put saves tiddler to the store, incrementing and returning revision.
 // The tiddler is also written to the tiddler_history bucket.
 func (s *boltStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error) {
-	var js map[string]interface{}
-	err := json.Unmarshal(tiddler.Meta, &js)
-	if err != nil {
-		return 0, err
-	}
 	var rev int
-	err = s.db.Update(func(tx *bolt.Tx) error {
+	err := s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("tiddler"))
 		mkey := []byte(tiddler.Key + "|1")
 
 		rev = getLastRevision(b, mkey)
-		js["revision"] = rev
-		data, err := json.Marshal(js)
+		tiddler.Js["revision"] = rev
+
+		data, err := tiddler.MarshalJSON() // meta with text & rev
 		if err != nil {
 			return err
 		}
 
-		err = b.Put(mkey, data)
-		if err != nil {
-			return err
-		}
-		err = b.Put([]byte(tiddler.Key+"|2"), []byte(tiddler.Text))
+		text, _ := tiddler.Js["text"].(string)
+		delete(tiddler.Js, "text")
+		meta, err := json.Marshal(tiddler.Js)
 		if err != nil {
 			return err
 		}
 
-		js["text"] = tiddler.Text
-		data, err = json.Marshal(js)
+		err = b.Put(mkey, meta)
 		if err != nil {
 			return err
 		}
+		err = b.Put([]byte(tiddler.Key+"|2"), []byte(text))
+		if err != nil {
+			return err
+		}
+
 		history := tx.Bucket([]byte("tiddler_history"))
 		err = history.Put([]byte(fmt.Sprintf("%s#%d", tiddler.Key, rev)), data)
 		if err != nil {
