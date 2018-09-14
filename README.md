@@ -47,16 +47,15 @@ required, so that index.html talks back to the server for content.
 The process for preparing a new index.html is:
 
 - Open tiddlywiki-5.1.17.html in your web browser.
-- `$:/plugins/tiddlywiki/tiddlyweb/save/offline` ~~`$:/config/SaverFilter`~~
-  - save openlist: `[all[]] -[[$:/HistoryList]] -[[$:/StoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
-  - no openlist: `[all[]] -[[$:/HistoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
-
 - Click the control panel (gear) icon.
 - Click the Plugins tab.
 - Click "Get more plugins".
 - Click "Open plugin library".
 - Type "tiddlyweb" into the search box. The "TiddlyWeb and TiddlySpace components" should appear.
 - Click Install. A bar at the top of the page should say "Please save and reload for the changes to take effect."
+- edit `$:/plugins/tiddlywiki/tiddlyweb/save/offline` (need some time for loading & saving)
+  - save openlist: `[all[]] -[[$:/HistoryList]] -[[$:/StoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
+  - no openlist: `[all[]] -[[$:/HistoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
 - Click the icon next to save, and an updated file will be downloaded.
 - Open the downloaded file in the web browser.
 - Repeat, adding any more plugins.

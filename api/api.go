@@ -18,14 +18,14 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"io"
+//	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
-	"strconv"
+//	"strconv"
 
 	"../store"
 )
@@ -210,18 +210,25 @@ func getTiddler(w http.ResponseWriter, r *http.Request) {
 func putTiddler(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimPrefix(r.URL.Path, "/recipes/all/tiddlers/")
 
-	var js map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&js)
+	buf, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	io.Copy(ioutil.Discard, r.Body)
+
+	var js map[string]interface{}
+//	err := json.NewDecoder(r.Body).Decode(&js)
+	err = json.Unmarshal(buf, &js)
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+//	io.Copy(ioutil.Discard, r.Body)
 
 	//fmt.Println("[D5]", js, js["revision"])
 
 	js["bag"] = "bag"
-	var rev int
+	/*var rev int
 	revstr, ok := js["revision"].(string)
 	if ok {
 		rev64, _ := strconv.ParseInt(revstr, 10, 64)
@@ -229,35 +236,43 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 	}
 	js["revision"] = fmt.Sprintf("%d", rev + 1)
 	text, _ := js["text"].(string)
-	delete(js, "text")
+	delete(js, "text")*/
 
-	meta, err := json.Marshal(js)
-	if err != nil {
-		internalError(w, err)
-		return
-	}
+	/*var rev int
+	withRev := false
+	revstr, ok := js["revision"].(string)
+	if ok {
+		rev64, _ := strconv.ParseInt(revstr, 10, 64)
+		rev = int(rev64)
+	}*/
 
-	//fmt.Println("[D6]", js, rev)
+	//text, withText := js["text"].(string)
 
+	isSys := strings.HasPrefix(key, "$:/")
 	isDraft := false
 	fields, ok := js["fields"].(map[string]interface{})
 	if ok {
 		_, isDraft = fields["draft.of"]
 	}
 
-	rev, err = Store.Put(r.Context(), store.Tiddler{
+	rev, err := Store.Put(r.Context(), store.Tiddler{
+		//Meta: buf,
+		//Text: text,
+		//WithText: withText,
+
 		Key:  key,
-		Meta: meta,
-		Text: text,
-		Revision: rev + 1,
 		IsDraft: isDraft,
+		IsSys: isSys,
+
+		Js: js,
 	})
 	if err != nil {
 		internalError(w, err)
 		return
 	}
 
-	etag := fmt.Sprintf(`"bag/%s/%d:%032x"`, url.QueryEscape(key), rev, md5.Sum(meta))
+	//etag := fmt.Sprintf(`"bag/%s/%d:%032x"`, url.QueryEscape(key), rev, md5.Sum(meta))
+	etag := fmt.Sprintf(`"bag/%s/%d:%032x"`, url.QueryEscape(key), rev, md5.Sum([]byte(buf)))
 	w.Header().Set("ETag", etag)
 	w.WriteHeader(http.StatusNoContent)
 }

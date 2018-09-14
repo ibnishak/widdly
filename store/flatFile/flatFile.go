@@ -18,13 +18,13 @@ import (
 	"bytes"
 	"context"
 	"strings"
-//	"encoding/json"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"io/ioutil"
 	"regexp"
-	"strconv"
+//	"strconv"
 
 	"../../store"
 )
@@ -98,104 +98,120 @@ func key2File(key string) string {
 }
 
 // Get retrieves a tiddler from the store by key (title).
-func (s *flatFileStore) Get(_ context.Context, key string) (store.Tiddler, error) {
-	t := store.Tiddler{WithText: true}
+func (s *flatFileStore) Get(_ context.Context, key string) (*store.Tiddler, error) {
+	isSys := strings.HasPrefix(key, "$:/")
 	key = key2File(key)
 	tiddlerPath := filepath.Join(s.tiddlersPath, key + ".tid")
 	tiddlerMetaPath := filepath.Join(s.tiddlersPath, key + ".meta")
-	if _, err := os.Stat(tiddlerPath); os.IsNotExist(err) {
-		return t, store.ErrNotFound
-	}else {
-		meta, err := ioutil.ReadFile(tiddlerMetaPath)
-		if err != nil {
-			return store.Tiddler{}, err
-		}
-		tiddler, err := ioutil.ReadFile(tiddlerPath)
-		if err != nil {
-			return store.Tiddler{}, err
-		}
-		t.Meta = make([]byte, len(meta))
-		copy(t.Meta, meta)
-		t.Text = string(tiddler)
+	if _, err := os.Stat(tiddlerMetaPath); os.IsNotExist(err) {
+		return nil, store.ErrNotFound
 	}
-	return t, nil
+
+	meta, err := ioutil.ReadFile(tiddlerMetaPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var tiddler []byte
+	if !isSys {
+		tiddler, err = ioutil.ReadFile(tiddlerPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	/*tiddler, err := ioutil.ReadFile(tiddlerPath)
+	if err != nil {
+		return nil, err
+	}*/
+
+	return store.NewTiddler(meta, tiddler)
 }
 
 // All retrieves all the tiddlers (mostly skinny) from the store.
 // Special tiddlers (like global macros) are returned fat.
-func (s *flatFileStore) All(_ context.Context) ([]store.Tiddler, error) {
-	tiddlers := []store.Tiddler{}
+func (s *flatFileStore) All(_ context.Context) ([]*store.Tiddler, error) {
+	tiddlers := make([]*store.Tiddler, 0)
 	files := checkExt(s.tiddlersPath, ".meta")
 	for _, file := range files {
-		var t store.Tiddler
+		var tiddler []byte
 		meta, _ := ioutil.ReadFile(filepath.Join(s.tiddlersPath, file))
-		t.Meta = make([]byte, len(meta))
-		copy(t.Meta, meta)
-		if bytes.Contains(t.Meta, []byte(`"$:/tags/Macro"`)) {
+		if bytes.Contains(meta, []byte(`"$:/tags/Macro"`)) {
 			var extension = filepath.Ext(file)
 			var tiddlerPath = file[0:len(file)-len(extension)]
-			tiddler, _ := ioutil.ReadFile(tiddlerPath + ".tid")
-			t.Text = string(tiddler)
-			t.WithText = true
+			tiddler, _ = ioutil.ReadFile(tiddlerPath + ".tid")
 		}
+		t, _ := store.NewTiddler(meta, tiddler)
 		tiddlers = append(tiddlers, t)
 	}
 	return tiddlers, nil
 }
 
 func getLastRevision(s *flatFileStore, key string) int {
-	var files []string
-	filepath.Walk(s.tiddlerHistoryPath, func(path string, f os.FileInfo, _ error) error {
-		if !f.IsDir() {
-			r, err := regexp.MatchString(key + "#\\d+", f.Name())
-			if err == nil && r {
-				files = append(files, f.Name())
-			}
-		}
-		return nil
-	})
-
+	key = key2File(key)
 	highestRev := 0
 
-	for _, file := range files {
-		filePart := strings.Split(file, "#")
-		rev, _ := strconv.Atoi(filePart[1])
-		if(rev > highestRev){
-			highestRev = rev
+	tiddlerMetaPath := filepath.Join(s.tiddlersPath, key + ".meta")
+	if _, err := os.Stat(tiddlerMetaPath); os.IsNotExist(err) {
+		return 0
+	}else {
+		meta, err := ioutil.ReadFile(tiddlerMetaPath)
+		if err != nil {
+			return 0
 		}
+
+		t, _ := store.NewTiddler(meta, nil)
+		highestRev = t.GetRevision() + 1
 	}
 
-	return highestRev + 1
+	return highestRev
 }
 
 // Put saves tiddler to the store, incrementing and returning revision.
 // The tiddler is also written to the tiddler_history bucket.
 func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error) {
 	var err error
-
-	sys := strings.HasPrefix(tiddler.Key, "$:/") // system key
 	key := key2File(tiddler.Key)
-	//rev := getLastRevision(s, key)
-	//tiddler.Revision = rev
-	rev := tiddler.Revision
 
-	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".tid"), []byte(tiddler.Text), 0644)
-	if err != nil {
-		return 0, err
-	}
-	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".meta"), tiddler.Meta, 0644)
-	if err != nil {
-		return 0, err
+	rev := getLastRevision(s, key)
+	tiddler.Js["revision"] = rev
+
+	if tiddler.IsSys {
+		meta, err := tiddler.MarshalJSON()
+		if err != nil {
+			return 0, err
+		}
+
+		err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".meta"), meta, 0644)
+		if err != nil {
+			return 0, err
+		}
+		return 0, nil
 	}
 
 	// skip Draft & system history
-	if !tiddler.IsDraft && !sys {
-		tiddler.SetRev = true
+	if !tiddler.IsDraft && !tiddler.IsSys {
 		data, err := tiddler.MarshalJSON()
 		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, rev)), data, 0644)
 		if err != nil {
 			return 0, err
 		}
+	}
+
+	text, _ := tiddler.Js["text"].(string)
+	delete(tiddler.Js, "text")
+	meta, err := json.Marshal(tiddler.Js)
+	if err != nil {
+		return 0, err
+	}
+
+	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".tid"), []byte(text), 0644)
+	if err != nil {
+		return 0, err
+	}
+	err = ioutil.WriteFile(filepath.Join(s.tiddlersPath, key + ".meta"), meta, 0644)
+	if err != nil {
+		return 0, err
 	}
 
 	return rev, nil
@@ -204,11 +220,11 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 // Delete deletes a tiddler with the given key (title) from the store.
 func (s *flatFileStore) Delete(ctx context.Context, key string) error {
 	key = key2File(key)
-	err := os.Remove(filepath.Join(s.tiddlersPath, key + ".tid"))
+	err := os.Remove(filepath.Join(s.tiddlersPath, key + ".meta"))
 	if err != nil {
 		return err
 	}
-	err = os.Remove(filepath.Join(s.tiddlersPath, key + ".meta"))
+	err = os.Remove(filepath.Join(s.tiddlersPath, key + ".tid"))
 	if err != nil {
 		return err
 	}
