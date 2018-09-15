@@ -16,7 +16,7 @@ package main
 
 import (
 //	"bytes"
-//	"crypto/subtle"
+	"crypto/subtle"
 	"flag"
 //	"io/ioutil"
 	"log"
@@ -49,11 +49,11 @@ func main() {
 	api.InitHandle(mux)
 
 	// Open the data store and tell HTTP handlers to use it.
-	api.Store = store.MustOpen(*dataSource)
+	api.StoreDb = store.MustOpen(*dataSource)
 
 	/*// Override api.ServeIndex to allow serving embedded index.html.
 	wiki := pathToWiki()
-	api.ServeIndex = func(w http.ResponseWriter, r *http.Request) {
+	api.ServeBase = func(w http.ResponseWriter, r *http.Request) {
 		if fi, err := os.Stat(wiki); err == nil && isRegular(fi) { // Prefer the real file, if it exists.
 			http.ServeFile(w, r, wiki)
 		} else {
@@ -69,6 +69,14 @@ func main() {
 			w.WriteHeader(http.StatusUnauthorized)
 		}
 	}*/
+
+	api.Authenticate = func(user string, pwd string) (bool) {
+		if subtle.ConstantTimeCompare([]byte(pwd), []byte("test")) == 1 &&
+			subtle.ConstantTimeCompare([]byte(user), []byte("admin")) == 1 { // DON'T use subtle.ConstantTimeCompare like this!
+			return true
+		}
+		return false
+	}
 
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }

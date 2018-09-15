@@ -12,6 +12,13 @@ Go 1.7+
 
     go get -u github.com/opennota/widdly
 
+## TODO
+
+- [ ] `$:/DefaultTiddlers` loaded but not show up
+- [x] add authorization back
+- [ ] multiple TiddlyWiki in subpath/suburl
+
+
 ## Usage
 
 Put `index.html` next to the executable (or, alternatively, embed `index.html`

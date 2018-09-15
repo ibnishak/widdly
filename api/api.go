@@ -32,29 +32,33 @@ import (
 
 var (
 	// Store should point to an implementation of TiddlerStore.
-	Store store.TiddlerStore
+	StoreDb store.TiddlerStore
+
+	Sess = NewSession()
 
 	// Authenticate is a hook that lets the client of the package to
 	// provide some authentication.
 	// Authenticate should write to the ResponseWriter iff the user
 	// may not access the endpoint.
-	Authenticate func(http.ResponseWriter, *http.Request)
+	//Authenticate func(http.ResponseWriter, *http.Request)
 
-	// ServeIndex is a callback that should serve the index page.
-	ServeIndex = func(w http.ResponseWriter, r *http.Request) {
+	// Authenticate is a hook that lets the client of the package to provide authentication.
+	Authenticate func(user string, pwd string) (bool)
+
+	// ServeBase is a callback that should serve the index page.
+	ServeBase = func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
 	}
 )
 
 func InitHandle(mux *Mux) {
-//	mux.HandleFunc("/", withLoggingAndAuth(index))
 	mux.HandleFunc("/", withLogging(index))
-	mux.HandleFunc("/status", withLoggingAndAuth(status))
-//	mux.HandleFunc("/challenge/tiddlywebplugins.tiddlyspace.cookie_form", login) // POST
-//	mux.HandleFunc("/logout", withLoggingAndAuth(logout)) // POST
-	mux.HandleFunc("/recipes/all/tiddlers.json", withLoggingAndAuth(list))
-	mux.HandleFunc("/recipes/all/tiddlers/", withLoggingAndAuth(tiddler))
-	mux.HandleFunc("/bags/bag/tiddlers/", withLoggingAndAuth(remove))
+	mux.HandleFunc("/status", withLogging(status))
+	mux.HandleFunc("/challenge/tiddlywebplugins.tiddlyspace.cookie_form", login) // POST, user=ee&password=11&tiddlyweb_redirect=%2Fstatus
+	mux.HandleFunc("/logout", logout) // POST
+	mux.HandleFunc("/recipes/all/tiddlers.json", withLogging(list))
+	mux.HandleFunc("/recipes/all/tiddlers/", withLogging(tiddler))
+	mux.HandleFunc("/bags/bag/tiddlers/", withLogging(remove))
 }
 
 // internalError logs err to the standard error and returns HTTP 500 Internal Server Error.
@@ -96,7 +100,7 @@ func (w *responseWriter) WriteHeader(status int) {
 }
 
 // withAuth is an authentication middleware.
-func withAuth(f http.HandlerFunc) http.HandlerFunc {
+/*func withAuth(f http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if Authenticate == nil {
 			f(w, r)
@@ -114,6 +118,25 @@ func withAuth(f http.HandlerFunc) http.HandlerFunc {
 
 func withLoggingAndAuth(f http.HandlerFunc) http.HandlerFunc {
 	return withAuth(withLogging(f))
+}*/
+
+func checkAuth(w http.ResponseWriter, r *http.Request) (ok bool) {
+	Sess.Dump()
+
+	sess, err := Sess.Start(w, r)
+	if err != nil {
+		internalError(w, err)
+		return ok
+	}
+
+	log.Println("[check]", sess, Sess, sess.IsLogin())
+	Sess.Dump()
+
+	if !sess.IsLogin() {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return ok
+	}
+	return true
 }
 
 // index serves the index page.
@@ -126,7 +149,10 @@ func index(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("DAV", "1, 2") // hack for WebDAV sync adaptor/saver
 		return
 	case "PUT":
-		// TODO: check auth
+		if !checkAuth(w, r) {
+			return
+		}
+
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			internalError(w, err)
@@ -140,15 +166,53 @@ func index(w http.ResponseWriter, r *http.Request) {
 		return
 	default:
 	}
-	/*if r.Method != "GET" {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}*/
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	ServeIndex(w, r)
+	ServeBase(w, r)
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	user := r.Form.Get("user")
+	pwd := r.Form.Get("password")
+
+	if Authenticate != nil {
+		ok := Authenticate(user, pwd)
+		if ok {
+			sess, err := Sess.Start(w, r)
+			if err != nil {
+				internalError(w, err)
+				return
+			}
+
+			if sess.IsLogin() {
+				return
+			}
+			sess.Login(user)
+		}
+
+		log.Println("[Login]", user, pwd, ok, Sess)
+		Sess.Dump()
+	}
+}
+
+func logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	Sess.Destroy(w, r)
 }
 
 // status serves the status JSON.
@@ -158,22 +222,27 @@ func status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sess, err := Sess.Start(w, r)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	log.Println("[SESS]", sess, Sess)
+
 	w.Header().Set("Content-Type", "application/json")
 
-	var ret []byte
-
-	//if !isAuth(r) {
-		ret = []byte(`{"username":"GUEST","space":{"recipe":"all"}}`)
-	//} else {
-	//	ret = []byte(`{"username":"me","space":{"recipe":"all"}}`)
-	//}
-
-	w.Write(ret)
+	uid, ok := sess.Get("uid")
+	if ok {
+		ret := fmt.Sprintf(`{"username":"%s","space":{"recipe":"all"}}`, uid)
+		w.Write([]byte(ret))
+	} else {
+		w.Write([]byte(`{"username":"GUEST","space":{"recipe":"all"}}`))
+	}
 }
 
 // list serves a JSON list of (mostly) skinny tiddlers.
 func list(w http.ResponseWriter, r *http.Request) {
-	tiddlers, err := Store.All(r.Context())
+	tiddlers, err := StoreDb.All(r.Context())
 	if err != nil {
 		internalError(w, err)
 		return
@@ -190,7 +259,7 @@ func list(w http.ResponseWriter, r *http.Request) {
 func getTiddler(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimPrefix(r.URL.Path, "/recipes/all/tiddlers/")
 
-	t, err := Store.Get(r.Context(), key)
+	t, err := StoreDb.Get(r.Context(), key)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -234,7 +303,7 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 		_, isDraft = fields["draft.of"]
 	}
 
-	rev, err := Store.Put(r.Context(), store.Tiddler{
+	rev, err := StoreDb.Put(r.Context(), store.Tiddler{
 		//Meta: buf,
 
 		Key:  key,
@@ -259,6 +328,9 @@ func tiddler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		getTiddler(w, r)
 	case "PUT":
+		if !checkAuth(w, r) {
+			return
+		}
 		putTiddler(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -271,8 +343,12 @@ func remove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !checkAuth(w, r) {
+		return
+	}
+
 	key := strings.TrimPrefix(r.URL.Path, "/bags/bag/tiddlers/")
-	err := Store.Delete(r.Context(), key)
+	err := StoreDb.Delete(r.Context(), key)
 	if err != nil {
 		internalError(w, err)
 		return
