@@ -19,28 +19,28 @@ import (
 	"net/http"
 
 	"errors"
-	"math/rand"
+//	"math/rand"
+	"encoding/base64"
+	"crypto/rand"
 	"sync"
 	"time"
 )
 
 var (
 	ErrCookie = errors.New("Cookie not found")
+	ErrRNG = errors.New("Could not successfully read from the system CSPRNG")
 )
 
 var (
 	CookieName = "sid"
 	CookieLifeTime = 24 * 7 * time.Hour
-
 	SessionTimeout = 30 * 60 * time.Second
 )
 
 type Store struct {
 	lock  sync.RWMutex
-//	sid   string                  //session id
 	t     time.Time               //last access time
 	val   map[string]interface{}  //session store
-//	login bool
 }
 
 type Session struct {
@@ -86,6 +86,15 @@ func (s *Session) cleaner() {
 	}
 }
 
+func (s *Session) GetSID(r *http.Request) (string, error) {
+	cookie, err := r.Cookie(CookieName)
+	if err != nil || cookie.Value == "" {
+		return "", ErrCookie
+	}
+
+	return cookie.Value, nil
+}
+
 func (s *Session) newSession(sid string) (*Store) {
 	sess := s.getSession(sid)
 	if sess != nil {
@@ -114,7 +123,7 @@ func (s *Session) getSession(sid string) (*Store) {
 func (s *Session) Start(w http.ResponseWriter, r *http.Request) (*Store, error) {
 	var session *Store
 
-	sid, err := getSID(r)
+	sid, err := s.GetSID(r)
 	if err != nil {
 		sid, err = genSID()
 		if err != nil {
@@ -150,7 +159,7 @@ func (s *Session) destroy(sid string) {
 }
 
 func (s *Session) Destroy(w http.ResponseWriter, r *http.Request) {
-	sid, err := getSID(r)
+	sid, err := s.GetSID(r)
 	if err != nil {
 		return
 	}
@@ -215,22 +224,12 @@ func (s *Store) Del(key string) {
 	s.lock.Unlock()
 }
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-_"
 func genSID() (string, error) {
-	b := make([]byte, 16)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	b := make([]byte, 18)
+	n, err := rand.Read(b)
+	if n != len(b) || err != nil {
+		return "", ErrRNG
 	}
-
-	return string(b), nil
-}
-
-func getSID(r *http.Request) (string, error) {
-	cookie, err := r.Cookie(CookieName)
-	if err != nil || cookie.Value == "" {
-		return "", ErrCookie
-	}
-
-	return cookie.Value, nil
+	return base64.URLEncoding.EncodeToString(b), nil
 }
 

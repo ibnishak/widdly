@@ -17,6 +17,7 @@ Go 1.7+
 - [ ] `$:/DefaultTiddlers` loaded but not show up
 - [x] add authorization back
 - [ ] multiple TiddlyWiki in subpath/suburl
+- [ ] ACL: login for read & edit, login for edit, all can edit
 
 
 ## Usage

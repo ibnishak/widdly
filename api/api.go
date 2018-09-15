@@ -36,12 +36,6 @@ var (
 
 	Sess = NewSession()
 
-	// Authenticate is a hook that lets the client of the package to
-	// provide some authentication.
-	// Authenticate should write to the ResponseWriter iff the user
-	// may not access the endpoint.
-	//Authenticate func(http.ResponseWriter, *http.Request)
-
 	// Authenticate is a hook that lets the client of the package to provide authentication.
 	Authenticate func(user string, pwd string) (bool)
 
@@ -84,44 +78,12 @@ func withLogging(f http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-type responseWriter struct {
-	http.ResponseWriter
-	written bool
-}
-
-func (w *responseWriter) Write(p []byte) (int, error) {
-	w.written = true
-	return w.ResponseWriter.Write(p)
-}
-
-func (w *responseWriter) WriteHeader(status int) {
-	w.written = true
-	w.ResponseWriter.WriteHeader(status)
-}
-
-// withAuth is an authentication middleware.
-/*func withAuth(f http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if Authenticate == nil {
-			f(w, r)
-		} else {
-			rw := responseWriter{
-				ResponseWriter: w,
-			}
-			Authenticate(&rw, r)
-			if !rw.written {
-				f(w, r)
-			}
-		}
-	}
-}
-
-func withLoggingAndAuth(f http.HandlerFunc) http.HandlerFunc {
-	return withAuth(withLogging(f))
-}*/
-
 func checkAuth(w http.ResponseWriter, r *http.Request) (ok bool) {
-	Sess.Dump()
+	_, err := Sess.GetSID(r)
+	if err != nil { // do not add cookie
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return false
+	}
 
 	sess, err := Sess.Start(w, r)
 	if err != nil {
@@ -222,6 +184,17 @@ func status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	gusetret := []byte(`{"username":"GUEST","space":{"recipe":"all"}}`)
+
+	_, err := Sess.GetSID(r)
+	if err != nil { // do not add cookie
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(gusetret)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
 	sess, err := Sess.Start(w, r)
 	if err != nil {
 		internalError(w, err)
@@ -229,14 +202,12 @@ func status(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("[SESS]", sess, Sess)
 
-	w.Header().Set("Content-Type", "application/json")
-
 	uid, ok := sess.Get("uid")
 	if ok {
 		ret := fmt.Sprintf(`{"username":"%s","space":{"recipe":"all"}}`, uid)
 		w.Write([]byte(ret))
 	} else {
-		w.Write([]byte(`{"username":"GUEST","space":{"recipe":"all"}}`))
+		w.Write(gusetret)
 	}
 }
 
@@ -286,13 +257,11 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var js map[string]interface{}
-//	err := json.NewDecoder(r.Body).Decode(&js)
 	err = json.Unmarshal(buf, &js)
 	if err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-//	io.Copy(ioutil.Discard, r.Body)
 
 	js["bag"] = "bag"
 
@@ -317,7 +286,6 @@ func putTiddler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//etag := fmt.Sprintf(`"bag/%s/%d:%032x"`, url.QueryEscape(key), rev, md5.Sum(meta))
 	etag := fmt.Sprintf(`"bag/%s/%d:%032x"`, url.QueryEscape(key), rev, md5.Sum([]byte(buf)))
 	w.Header().Set("ETag", etag)
 	w.WriteHeader(http.StatusNoContent)

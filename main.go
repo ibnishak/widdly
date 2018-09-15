@@ -21,8 +21,8 @@ import (
 //	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
+//	"os"
+//	"path/filepath"
 //	"strconv"
 //	"strings"
 //	"time"
@@ -51,25 +51,6 @@ func main() {
 	// Open the data store and tell HTTP handlers to use it.
 	api.StoreDb = store.MustOpen(*dataSource)
 
-	/*// Override api.ServeIndex to allow serving embedded index.html.
-	wiki := pathToWiki()
-	api.ServeBase = func(w http.ResponseWriter, r *http.Request) {
-		if fi, err := os.Stat(wiki); err == nil && isRegular(fi) { // Prefer the real file, if it exists.
-			http.ServeFile(w, r, wiki)
-		} else {
-			http.NotFound(w, r)
-		}
-	}*/
-
-	/*api.Authenticate = func(w http.ResponseWriter, r *http.Request) {
-		user, pass, ok := r.BasicAuth()
-		if !ok || subtle.ConstantTimeCompare([]byte(pass), []byte("test")) != 1 ||
-			subtle.ConstantTimeCompare([]byte(user), []byte("admin")) != 1 { // DON'T use subtle.ConstantTimeCompare like this!
-			w.Header().Add("Www-Authenticate", `Basic realm="Who are you?"`)
-			w.WriteHeader(http.StatusUnauthorized)
-		}
-	}*/
-
 	api.Authenticate = func(user string, pwd string) (bool) {
 		if subtle.ConstantTimeCompare([]byte(pwd), []byte("test")) == 1 &&
 			subtle.ConstantTimeCompare([]byte(user), []byte("admin")) == 1 { // DON'T use subtle.ConstantTimeCompare like this!
@@ -80,26 +61,5 @@ func main() {
 
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
-
-// pathToWiki returns a path that should be checked for index.html.
-// If there is index.html, it should be put next to the executable.
-// If for some reason pathToWiki fails to find the path to the current executable,
-// it falls back to searching in the current directory.
-func pathToWiki() string {
-	dir := ""
-	path, err := os.Executable()
-	if err == nil {
-		dir = filepath.Dir(path)
-	} else if wd, err := os.Getwd(); err == nil {
-		dir = wd
-	}
-	return filepath.Join(dir, "index.html")
-}
-
-// isRegular returns true iff the file described by fi is a regular file.
-func isRegular(fi os.FileInfo) bool {
-	return fi.Mode()&os.ModeType == 0
-}
-
 
 
