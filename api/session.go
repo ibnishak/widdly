@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"errors"
-//	"math/rand"
 	"encoding/base64"
 	"crypto/rand"
 	"sync"

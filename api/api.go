@@ -18,14 +18,12 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-//	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
-//	"strconv"
 
 	"../store"
 )
@@ -90,9 +88,6 @@ func checkAuth(w http.ResponseWriter, r *http.Request) (ok bool) {
 		internalError(w, err)
 		return ok
 	}
-
-	log.Println("[check]", sess, Sess, sess.IsLogin())
-	Sess.Dump()
 
 	if !sess.IsLogin() {
 		http.Error(w, "Forbidden", http.StatusForbidden)
@@ -163,9 +158,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 			}
 			sess.Login(user)
 		}
-
-		log.Println("[Login]", user, pwd, ok, Sess)
-		Sess.Dump()
 	}
 }
 
@@ -200,7 +192,6 @@ func status(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	log.Println("[SESS]", sess, Sess)
 
 	uid, ok := sess.Get("uid")
 	if ok {

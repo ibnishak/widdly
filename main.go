@@ -15,18 +15,10 @@
 package main
 
 import (
-//	"bytes"
 	"crypto/subtle"
 	"flag"
-//	"io/ioutil"
 	"log"
 	"net/http"
-//	"os"
-//	"path/filepath"
-//	"strconv"
-//	"strings"
-//	"time"
-
 
 	"./api"
 	"./store"
@@ -38,8 +30,7 @@ import (
 
 var (
 	addr       = flag.String("http", "127.0.0.1:8080", "HTTP service address")
-	password   = flag.String("p", "", "Optional password to protect the wiki (the username is widdly)")
-	dataSource = flag.String("db", "widdly.db", "Database file")
+	dataSource = flag.String("db", "widdly.db", "Database path/file")
 )
 
 func main() {
