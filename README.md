@@ -18,8 +18,9 @@ Go 1.7+
 - [x] add authorization back
 - [ ] multiple TiddlyWiki in subpath/suburl
 - [ ] ACL: login for read & edit, login for edit, all can edit
-- [ ] check user/pass in file/db
+- [x] check user/pass in file/db
 - [ ] fix api_test.go & add more test
+- [ ] set max keeping history revisions
 
 
 ## Usage
