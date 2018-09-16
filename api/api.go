@@ -186,13 +186,13 @@ func status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	sess, err := Sess.Start(w, r)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 
 	uid, ok := sess.Get("uid")
 	if ok {

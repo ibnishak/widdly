@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"io/ioutil"
-	"regexp"
 
 	"../../store"
 )
@@ -53,8 +52,7 @@ func checkExt(pathS string, ext string) []string {
 	var files []string
 	filepath.Walk(pathS, func(path string, f os.FileInfo, _ error) error {
 		if !f.IsDir() {
-			r, err := regexp.MatchString(ext, f.Name())
-			if err == nil && r {
+			if filepath.Ext(f.Name()) == ext {
 				files = append(files, f.Name())
 			}
 		}

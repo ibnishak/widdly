@@ -20,7 +20,6 @@ import (
 	"net/http"
 
 	"time"
-	"crypto/subtle"
 	"crypto/sha256"
 	"crypto/rand"
 	"encoding/hex"
@@ -87,7 +86,7 @@ func main() {
 
 	api.Authenticate = func(user string, pwd string) (bool) {
 		t0 := time.Now().Add(time.Second)
-		defer time.Sleep(time.Until(t0)) // prevent brute force
+		defer time.Sleep(time.Until(t0)) // prevent brute force & timing attacks
 
 		u, ok := userlist[user]
 		if !ok {
@@ -95,7 +94,7 @@ func main() {
 		}
 
 		hpwd := pwdHashStr(pwd, u.Salt)
-		if subtle.ConstantTimeCompare([]byte(hpwd), []byte(u.Hash)) == 1 {
+		if hpwd == u.Hash {
 			return true
 		}
 		return false
