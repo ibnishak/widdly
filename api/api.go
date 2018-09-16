@@ -90,6 +90,7 @@ func checkAuth(w http.ResponseWriter, r *http.Request) (ok bool) {
 	}
 
 	if !sess.IsLogin() {
+		Sess.Destroy(w, r)
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return ok
 	}
@@ -198,6 +199,7 @@ func status(w http.ResponseWriter, r *http.Request) {
 		ret := fmt.Sprintf(`{"username":"%s","space":{"recipe":"all"}}`, uid)
 		w.Write([]byte(ret))
 	} else {
+		Sess.Destroy(w, r)
 		w.Write(gusetret)
 	}
 }

@@ -28,12 +28,15 @@ import (
 var (
 	ErrCookie = errors.New("Cookie not found")
 	ErrRNG = errors.New("Could not successfully read from the system CSPRNG")
+	ErrSessionLimit = errors.New("too many sessions")
 )
 
 var (
-	CookieName = "sid"
-	CookieLifeTime = 24 * 7 * time.Hour
-	SessionTimeout = 30 * 60 * time.Second
+	CookieName         = "sid"
+	CookieLifeTime     = 35 * time.Minute //24 * 7 * time.Hour
+	SessionTimeout     = 30 * 60 * time.Second
+	SessionGCTime      = 30 * time.Second //15 * time.Minute
+	SessionCountLimit  = 4096
 )
 
 type Store struct {
@@ -44,11 +47,13 @@ type Store struct {
 
 type Session struct {
 	lock     sync.RWMutex
+	end      chan struct{}
 	clients  map[string]*Store
 }
 
 func NewSession() (*Session) {
 	s := &Session {
+		end: make(chan struct{}),
 		clients: make(map[string]*Store),
 	}
 
@@ -58,7 +63,16 @@ func NewSession() (*Session) {
 }
 
 func (s *Session) cleaner() {
+	tick := time.NewTicker(SessionGCTime)
+	defer tick.Stop()
+
 	for {
+		select {
+		case <-tick.C:
+		case <-s.end:
+			return
+		}
+
 		list := make([]string, 0)
 		s.lock.RLock()
 		for sid, _ := range s.clients {
@@ -80,8 +94,14 @@ func (s *Session) cleaner() {
 				s.lock.Unlock()
 			}
 		}
+	}
+}
 
-		time.Sleep(30 * time.Second)
+func (s *Session) Close() {
+	select {
+	case <-s.end:
+	default:
+		close(s.end)
 	}
 }
 
@@ -104,8 +124,12 @@ func (s *Session) newSession(sid string) (*Store) {
 	sess = NewStore()
 
 	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if len(s.clients) > SessionCountLimit {
+		return nil
+	}
 	s.clients[sid] = sess
-	s.lock.Unlock()
 
 	return sess
 }
@@ -131,6 +155,9 @@ func (s *Session) Start(w http.ResponseWriter, r *http.Request) (*Store, error) 
 		}
 	}
 	session = s.newSession(sid)
+	if session == nil {
+		return nil, ErrSessionLimit
+	}
 
 	cookie := &http.Cookie{
 		Name: CookieName,
