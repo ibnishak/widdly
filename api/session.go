@@ -97,6 +97,7 @@ func (s *Session) GetSID(r *http.Request) (string, error) {
 func (s *Session) newSession(sid string) (*Store) {
 	sess := s.getSession(sid)
 	if sess != nil {
+		sess.ReNew()
 		return sess
 	}
 
@@ -220,6 +221,12 @@ func (s *Store) Set(key string, val interface{}) {
 func (s *Store) Del(key string) {
 	s.lock.Lock()
 	delete(s.val, key)
+	s.lock.Unlock()
+}
+
+func (s *Store) ReNew() {
+	s.lock.Lock()
+	s.t = time.Now().Add(SessionTimeout)
 	s.lock.Unlock()
 }
 

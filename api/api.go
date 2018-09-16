@@ -204,6 +204,15 @@ func status(w http.ResponseWriter, r *http.Request) {
 
 // list serves a JSON list of (mostly) skinny tiddlers.
 func list(w http.ResponseWriter, r *http.Request) {
+	_, err := Sess.GetSID(r)
+	if err == nil { // renew session
+		_, err := Sess.Start(w, r)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+	}
+
 	tiddlers, err := StoreDb.All(r.Context())
 	if err != nil {
 		internalError(w, err)
