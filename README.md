@@ -8,9 +8,11 @@ for a personal [TiddlyWiki](http://tiddlywiki.com/).
 
 Go 1.7+
 
-## Installation
+## Build
 
-    go get -u github.com/opennota/widdly
+    $ git clone --depth=1 https://github.com/cs8425/widdly.git
+    $ cd widdly
+    $ go build .
 
 ## TODO
 
@@ -25,25 +27,19 @@ Go 1.7+
 
 ## Usage
 
-Put `index.html` next to the executable (or, alternatively, embed `index.html`
-into the executable by running `zip -9 - index.html | cat >> widdly`). Run:
+Setup account:
 
-    widdly -http :1337 -p letmein -db /path/to/the/database
+    ./widdly -u <username> -p <password> > user.lst
+
+
+Run:
+
+    ./widdly -http :1337 -acc user.lst -db /path/to/the/database
 
 - `-http :1337` - listen on port 1337 (by default port 8080 on localhost)
-- `-p letmein` - protect by the password (optional); the username will be `widdly`.
-- `-db /path/to/the/database` - explicitly specify which file to use for the
-  database (by default `widdly.db` in the current directory)
+- `-acc user.lst` - user list file.
+- `-db /path/to/the/database` - explicitly specify which file to use for the database (by default `widdly.db` in the current directory)
 
-## Build your own index.html
-
-    git clone https://github.com/Jermolene/TiddlyWiki5
-    cd TiddlyWiki5
-    node tiddlywiki.js editions/empty --build index
-
-Open `editions/empty/output/index.html` in a browser and install some plugins
-(at the very least, the "TiddlyWeb and TiddlySpace components" plugin). You
-will be prompted to save the updated index.html.
 
 ## TiddlyWiki base image
 
@@ -65,8 +61,8 @@ The process for preparing a new index.html is:
 - Type "tiddlyweb" into the search box. The "TiddlyWeb and TiddlySpace components" should appear.
 - Click Install. A bar at the top of the page should say "Please save and reload for the changes to take effect."
 - edit `$:/plugins/tiddlywiki/tiddlyweb/save/offline` (need some time for loading & saving)
-  - save openlist: `[all[]] -[[$:/HistoryList]] -[[$:/StoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
-  - no openlist: `[all[]] -[[$:/HistoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
+  - not save openlist: `[all[]] -[[$:/HistoryList]] -[[$:/StoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
+  - save openlist: `[all[]] -[[$:/HistoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
 - Click the icon next to save, and an updated file will be downloaded.
 - Open the downloaded file in the web browser.
 - Repeat, adding any more plugins.
