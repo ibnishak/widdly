@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"../../bolt"
+	bolt "go.etcd.io/bbolt"
 
 	"../../store"
 )
