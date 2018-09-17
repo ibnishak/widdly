@@ -32,7 +32,7 @@ import (
 
 	"./api"
 	"./store"
-//	_ "./store/bolt"
+	_ "./store/bolt"
 //	_ "./store/sqlite"
 	_ "./store/flatFile"
 
@@ -43,6 +43,7 @@ var (
 
 	addr       = flag.String("http", "127.0.0.1:8080", "HTTP service address")
 	dataSource = flag.String("db", "widdly.db", "Database path/file")
+	dataType   = flag.String("dbt", "flatFile", "Database type")
 
 	gziplv   = flag.Int("gz", 1, "gzip compress level")
 
@@ -67,10 +68,13 @@ func main() {
 		return
 	}
 
+	fmt.Println("[server] version =", VERSION)
+	fmt.Println("[server] gzip level =", *gziplv)
+
 	// read in accounts
 	af, err := os.Open(*accounts)
 	if err != nil {
-		fmt.Println("[Open error]", err)
+		fmt.Println("[Open Accounts error]", err)
 		return
 	}
 
@@ -86,7 +90,14 @@ func main() {
 	api.InitHandle(mux)
 
 	// Open the data store and tell HTTP handlers to use it.
-	api.StoreDb = store.MustOpen(*dataSource)
+	db, err := store.Open(*dataType, *dataSource)
+	if err != nil {
+		list := store.ListBackend()
+		fmt.Println("[Open backend error]", err)
+		fmt.Println("[backend list]", list)
+		return
+	}
+	api.StoreDb = db
 
 	api.GzipLevel = *gziplv
 
@@ -105,9 +116,6 @@ func main() {
 		}
 		return false
 	}
-
-	fmt.Println("[server] version =", VERSION)
-	fmt.Println("[server] gzip level =", *gziplv)
 
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }

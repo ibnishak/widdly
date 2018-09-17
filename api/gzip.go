@@ -18,7 +18,6 @@ import (
 	"compress/gzip"
 	"net/http"
 	"strings"
-//	"fmt"
 )
 
 var (
@@ -35,16 +34,13 @@ func (w *GzipResponseWriter) Write(p []byte) (int, error) {
 		return w.ResponseWriter.Write(p)
 	}
 
-	n, err := w.gzip.Write(p)
-	//fmt.Println("[gz]Write()", w, n, err)
-	return n, err
+	return w.gzip.Write(p)
 }
 
 func (w *GzipResponseWriter) Close() (error) {
 	if w.gzip != nil {
 		return w.gzip.Close()
 	}
-	//fmt.Println("[gz]Close()", w)
 	return nil
 }
 
@@ -69,7 +65,6 @@ func TryGzipResponse(w http.ResponseWriter, r *http.Request) (*GzipResponseWrite
 	}
 	w.Header().Set("Content-Encoding", "gzip")
 	w.Header().Del("Content-Length")
-	//fmt.Println("[gz]", r, gw)
 
 	return &GzipResponseWriter{w, gw}
 }

@@ -21,8 +21,18 @@ import (
 	"errors"
 )
 
-// ErrNotFound is the error returned by the TiddlerStore when no tiddlers with a given key are found.
-var ErrNotFound = errors.New("not found")
+var (
+	// ErrNotFound is the error returned by the TiddlerStore when no tiddlers with a given key are found.
+	ErrNotFound = errors.New("not found")
+
+	ErrDBExist = errors.New("same backend exist")
+	ErrDBNotExist = errors.New("backend not exist")
+
+	backendlist = make(map[string]*TiddlerBackend)
+)
+
+type OpenFn (func (string) (TiddlerStore, error))
+//type MustOpenFn (func (string) (TiddlerStore))
 
 // Tiddler is a fundamental piece of content in TiddlyWeb.
 type Tiddler struct {
@@ -102,6 +112,56 @@ type TiddlerStore interface {
 	Delete(ctx context.Context, key string) error
 }
 
+type TiddlerBackend struct {
+	Name string
+	Open OpenFn
+	//MustOpen OpenFn
+}
+
 // MustOpen is a function variable assigned by the TiddlerStore implementations.
 // MustOpen must return a working TiddlerStore given a data source.
-var MustOpen func(dataSource string) TiddlerStore
+func MustOpen(dataSource string) (TiddlerStore) {
+	if len(backendlist) == 1 {
+		for _, db := range backendlist {
+			ss, err := db.Open(dataSource)
+			if err != nil {
+				panic(err)
+			}
+			return ss
+		}
+	}
+
+	panic("has multi backends, please use Open() select one!")
+}
+
+func Open(name string, dataSource string) (TiddlerStore, error) {
+	db, ok := backendlist[name]
+	if !ok {
+		return nil, ErrDBNotExist
+	}
+	return db.Open(dataSource)
+}
+
+func RegBackend(name string, fn OpenFn) (error) {
+	if fn == nil {
+		return ErrDBNotExist
+	}
+	_, ok := backendlist[name]
+	if ok {
+		return ErrDBExist
+	}
+	backendlist[name] = &TiddlerBackend{
+		Name: name,
+		Open: fn,
+	}
+	return nil
+}
+
+func ListBackend() ([]string) {
+	list := make([]string, 0, len(backendlist))
+	for _, db := range backendlist {
+		list = append(list, db.Name)
+	}
+	return list
+}
+

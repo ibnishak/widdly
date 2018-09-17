@@ -26,7 +26,7 @@ Go 1.7+
 - [ ] fix api_test.go & add more test
 - [ ] set max keeping history revisions
 - [x] send base html with gzip
-- [ ] set backend type without re-compile
+- [x] set backend type without re-compile
 
 
 ## Usage

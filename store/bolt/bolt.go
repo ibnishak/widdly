@@ -25,25 +25,37 @@ import (
 	"../../store"
 )
 
+const (
+	TypeName = "bbolt"
+)
+
 // boltStore is a BoltDB store for tiddlers.
 type boltStore struct {
 	db *bolt.DB
 }
 
 func init() {
-	if store.MustOpen != nil {
-		panic("attempt to use two different backends at the same time!")
+	err := store.RegBackend(TypeName, Open)
+	if err != nil {
+		panic("multi backends with same type at the same time!")
 	}
-	store.MustOpen = MustOpen
 }
 
 // MustOpen opens the BoltDB file specified as dataSource,
 // creates the necessary buckets and returns a TiddlerStore.
 // MustOpen panics if there is an error.
 func MustOpen(dataSource string) store.TiddlerStore {
+	s, err := Open(dataSource)
+	if err != nil {
+	    panic(err)
+	}
+	return s
+}
+
+func Open(dataSource string) (store.TiddlerStore, error) {
 	db, err := bolt.Open(dataSource, 0600, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte("tiddler"))
@@ -57,9 +69,9 @@ func MustOpen(dataSource string) store.TiddlerStore {
 		return nil
 	})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return &boltStore{db}
+	return &boltStore{db}, nil
 }
 
 // Get retrieves a tiddler from the store by key (title).

@@ -27,6 +27,10 @@ import (
 	"../../store"
 )
 
+const (
+	TypeName = "flatFile"
+)
+
 // flatFileStore is a file base store for tiddlers.
 type flatFileStore struct {
 	storePath string
@@ -35,10 +39,10 @@ type flatFileStore struct {
 }
 
 func init() {
-	if store.MustOpen != nil {
-		panic("attempt to use two different backends at the same time!")
+	err := store.RegBackend(TypeName, Open)
+	if err != nil {
+		panic("multi backends with same type at the same time!")
 	}
-	store.MustOpen = MustOpen
 }
 
 func exists(path string) (bool, error) {
@@ -51,7 +55,7 @@ func exists(path string) (bool, error) {
 func checkExt(pathS string, ext string) []string {
 	var files []string
 	filepath.Walk(pathS, func(path string, f os.FileInfo, _ error) error {
-		if !f.IsDir() {
+		if f != nil && !f.IsDir() {
 			if filepath.Ext(f.Name()) == ext {
 				files = append(files, f.Name())
 			}
@@ -65,21 +69,31 @@ func checkExt(pathS string, ext string) []string {
 // creates the necessary buckets and returns a TiddlerStore.
 // MustOpen panics if there is an error.
 func MustOpen(dataSource string) store.TiddlerStore {
-	storePath := filepath.Join(".", dataSource)
-	if _, err := os.Stat(storePath); os.IsNotExist(err) {
-	    os.Mkdir(storePath, os.ModePerm)
+	s, err := Open(dataSource)
+	if err != nil {
+	    panic(err)
 	}
+	return s
+}
 
+func Open(dataSource string) (store.TiddlerStore, error) {
+	storePath := filepath.Join(".", dataSource)
 	tiddlersPath := filepath.Join(storePath, "tiddlers")
 	if _, err := os.Stat(tiddlersPath); os.IsNotExist(err) {
-	    os.Mkdir(tiddlersPath, os.ModePerm)
+		err = os.MkdirAll(tiddlersPath, os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	tiddlerHistoryPath := filepath.Join(storePath, "tiddlerHistory")
 	if _, err := os.Stat(tiddlerHistoryPath); os.IsNotExist(err) {
-	    os.Mkdir(tiddlerHistoryPath, os.ModePerm)
+		err = os.MkdirAll(tiddlerHistoryPath, os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return &flatFileStore{storePath, tiddlersPath, tiddlerHistoryPath}
+	return &flatFileStore{storePath, tiddlersPath, tiddlerHistoryPath}, nil
 }
 
 func key2File(key string) string {

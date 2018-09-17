@@ -25,31 +25,46 @@ import (
 	"../../store"
 )
 
+const (
+	TypeName = "sqlite"
+)
+
 // sqliteStore is a sqliteDB store for tiddlers.
 type sqliteStore struct {
 	db *sql.DB
 }
 
 func init() {
-	if store.MustOpen != nil {
-		panic("attempt to use two different backends at the same time!")
+	err := store.RegBackend(TypeName, Open)
+	if err != nil {
+		panic("multi backends with same type at the same time!")
 	}
-	store.MustOpen = MustOpen
 }
 
 // MustOpen opens the BoltDB file specified as dataSource,
 // creates the necessary buckets and returns a TiddlerStore.
 // MustOpen panics if there is an error.
 func MustOpen(dataSource string) store.TiddlerStore {
+	s, err := Open(dataSource)
+	if err != nil {
+	    panic(err)
+	}
+	return s
+}
+
+func Open(dataSource string) (store.TiddlerStore, error) {
 	db, err := sql.Open("sqlite3", dataSource)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	initStmt := `
-		CREATE TABLE tiddler (id integer not null primary key AUTOINCREMENT, title text, meta text, content text, revision integer);
+		CREATE TABLE IF NOT EXISTS tiddler (id integer not null primary key AUTOINCREMENT, title text, meta text, content text, revision integer);
 	`
 	_, err = db.Exec(initStmt)
-	return &sqliteStore{db}
+	if err != nil {
+		return nil, err
+	}
+	return &sqliteStore{db}, nil
 }
 
 // Get retrieves a tiddler from the store by key (title).
@@ -61,7 +76,7 @@ func (s *sqliteStore) Get(_ context.Context, key string) (*store.Tiddler, error)
 	if err != nil {
 		return nil, err
 	}
-	return store.NewTiddler(meta, content)
+	return store.NewTiddler([]byte(meta), []byte(content))
 }
 
 func copyOf(p []byte) []byte {
@@ -73,12 +88,10 @@ func copyOf(p []byte) []byte {
 // All retrieves all the tiddlers (mostly skinny) from the store.
 // Special tiddlers (like global macros) are returned fat.
 func (s *sqliteStore) All(_ context.Context) ([]*store.Tiddler, error) {
-	tiddlers := []store.Tiddler{}
 	tiddlers := make([]*store.Tiddler, 0)
 	rows, err := s.db.Query(`SELECT meta, content FROM tiddler`)
 	defer rows.Close()
 	for rows.Next() {
-		var t store.Tiddler
 		var meta string
 		var content string
 		if err := rows.Scan(&meta, &content); err != nil {
@@ -86,7 +99,7 @@ func (s *sqliteStore) All(_ context.Context) ([]*store.Tiddler, error) {
 		}
 
 		var tiddler []byte
-		metabuf = []byte(meta)
+		metabuf := []byte(meta)
 		if bytes.Contains(metabuf, []byte(`"$:/tags/Macro"`)) {
 			tiddler = []byte(content)
 		}
