@@ -61,9 +61,25 @@ rungo() {
 
 
 for v in ${ARCHS[@]}; do
-	startgo $v build -o bin/widdly.$v -ldflags "$LDFLAGS" -gcflags "$GCFLAGS" .
-	#go-$v build -o bin/widdly.$v -ldflags "$LDFLAGS" -gcflags "$GCFLAGS" .
+	startgo $v build -o $OUT/widdly-$v.elf -ldflags "$LDFLAGS" -gcflags "$GCFLAGS" .
+	#go-$v build -o $OUT/widdly-$v.elf -ldflags "$LDFLAGS" -gcflags "$GCFLAGS" .
 done
 
+mv $OUT/widdly-win32.elf $OUT/widdly-win32.exe
+mv $OUT/widdly-win64.elf $OUT/widdly-win64.exe
+cp index.html $OUT
 
+cd $OUT
+for v in *.elf; do
+	#zip ${v%.elf}.zip $v index.html
+	tar -czf ${v%.elf}.tar.gz $v index.html
+done
+
+for v in *.exe; do
+	zip ${v%.exe}.zip $v index.html
+	#tar -czf ${v%.exe}.tar.gz $v index.html
+done
+
+sha256sum *.tar.gz
+sha256sum *.zip
 
