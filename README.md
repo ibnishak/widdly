@@ -23,6 +23,8 @@ Go 1.7+
 - [x] check user/pass in file/db
 - [ ] fix api_test.go & add more test
 - [ ] set max keeping history revisions
+- [ ] send base html with gzip
+- [ ] set backend type without re-compile
 
 
 ## Usage
@@ -41,6 +43,25 @@ Run:
 - `-db /path/to/the/database` - explicitly specify which file to use for the database (by default `widdly.db` in the current directory)
 
 
+## Different between 'Save' button and TiddlyWeb's ajax sync
+
+|                                      | Save only [1]                | TiddlyWeb only                                                        | TiddlyWeb and Save [2]      |
+|--------------------------------------|------------------------------|-----------------------------------------------------------------------|-----------------------------|
+| can install plugin                   | yes [3]                      | no, need update base file                                             | yes [4]                     |
+| update sending size                  | big, full html file (~2MB)   | little (~ tiddler's size)                                             | little, except click 'Save' |
+| load tiddlers/configs from base file | once when page opened        | same as 'Save only'                                                   | same as 'Save only'         |
+| load tiddlers/configs by ajax        | no                           | yes, can override base file values                                    | same as 'TiddlyWeb only'    |
+| save tiddlers/configs into base file | yes                          | no                                                                    | yes [4]                     |
+| save tiddlers/configs by ajax        | no                           | yes                                                                   | yes                         |
+| loading timing                       | all in once when page opened | tiddlers in base file when page opened and then load others with ajax | same as 'TiddlyWeb only'    |
+
+
+- [1] base on WebDAV
+- [2] this implement
+- [3] need to disable all authorization in current implement, or use WebDAV method
+- [4] by using WebDAV
+
+
 ## TiddlyWiki base image
 
 The TiddlyWiki code is stored in and served from index.html, which
@@ -48,8 +69,7 @@ The TiddlyWiki code is stored in and served from index.html, which
 
 Plugins must be pre-baked into the TiddlyWiki file, not stored on the server
 as lazily loaded Tiddlers. The index.html in this directory is 5.1.17 with
-the TiddlyWeb and Markdown plugins added. The TiddlyWeb plugin is
-required, so that index.html talks back to the server for content.
+the TiddlyWeb added. The TiddlyWeb plugin is required, so that index.html talks back to the server for content.
 
 The process for preparing a new index.html is:
 
@@ -65,7 +85,7 @@ The process for preparing a new index.html is:
   - save openlist: `[all[]] -[[$:/HistoryList]] -[[$:/Import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/temp/]] -[field:bag[bag]] -[has[draft.of]]`
 - Click the icon next to save, and an updated file will be downloaded.
 - Open the downloaded file in the web browser.
-- Repeat, adding any more plugins.
+- Repeat, adding any more plugins. Or add it later when "widdly" start.
 - Copy the final download to index.html.
 
 ## Similar projects
