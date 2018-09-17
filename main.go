@@ -45,7 +45,7 @@ var (
 	dataSource = flag.String("db", "widdly.db", "Database path/file")
 	dataType   = flag.String("dbt", "flatFile", "Database type")
 
-	gziplv   = flag.Int("gz", 1, "gzip compress level")
+	gziplv   = flag.Int("gz", 1, "gzip compress level, 0 for disable")
 
 	accounts   = flag.String("acc", "user.lst", "user list file")
 	// eache line : <user>\t<salt>\t<sha256(pwd)>

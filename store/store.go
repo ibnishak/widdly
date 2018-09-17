@@ -17,6 +17,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"strconv"
 	"errors"
 )
@@ -32,7 +33,6 @@ var (
 )
 
 type OpenFn (func (string) (TiddlerStore, error))
-//type MustOpenFn (func (string) (TiddlerStore))
 
 // Tiddler is a fundamental piece of content in TiddlyWeb.
 type Tiddler struct {
@@ -115,7 +115,6 @@ type TiddlerStore interface {
 type TiddlerBackend struct {
 	Name string
 	Open OpenFn
-	//MustOpen OpenFn
 }
 
 // MustOpen is a function variable assigned by the TiddlerStore implementations.
@@ -135,6 +134,7 @@ func MustOpen(dataSource string) (TiddlerStore) {
 }
 
 func Open(name string, dataSource string) (TiddlerStore, error) {
+	name = strings.ToLower(name)
 	db, ok := backendlist[name]
 	if !ok {
 		return nil, ErrDBNotExist
@@ -142,16 +142,17 @@ func Open(name string, dataSource string) (TiddlerStore, error) {
 	return db.Open(dataSource)
 }
 
-func RegBackend(name string, fn OpenFn) (error) {
+func RegBackend(nameo string, fn OpenFn) (error) {
 	if fn == nil {
 		return ErrDBNotExist
 	}
+	name := strings.ToLower(nameo)
 	_, ok := backendlist[name]
 	if ok {
 		return ErrDBExist
 	}
 	backendlist[name] = &TiddlerBackend{
-		Name: name,
+		Name: nameo,
 		Open: fn,
 	}
 	return nil

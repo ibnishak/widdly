@@ -41,17 +41,8 @@ func init() {
 	}
 }
 
-// MustOpen opens the BoltDB file specified as dataSource,
+// Open opens the BoltDB file specified as dataSource,
 // creates the necessary buckets and returns a TiddlerStore.
-// MustOpen panics if there is an error.
-func MustOpen(dataSource string) store.TiddlerStore {
-	s, err := Open(dataSource)
-	if err != nil {
-	    panic(err)
-	}
-	return s
-}
-
 func Open(dataSource string) (store.TiddlerStore, error) {
 	db, err := bolt.Open(dataSource, 0600, nil)
 	if err != nil {

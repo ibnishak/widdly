@@ -10,10 +10,22 @@ Go 1.7+
 
 ## Build
 
-    $ git clone --depth=1 https://github.com/cs8425/widdly.git
+get source
+
+    $ git clone --depth=1 https://github.com/cs8425/widdly.git # get source
     $ cd widdly
-    $ go build . # build
-    or
+
+(optional) get dependency
+
+    $ go get go.etcd.io/bbolt # bolt/bbolt support, cross-compile can work
+    $ go get github.com/mattn/go-sqlite3 # sqlite support, won't work for cross-compile
+
+build:
+
+    $ go build .
+
+or
+
     $ ./build_all.sh # build multi-arch executable binary to bin/widdly.*
 
 ## TODO
@@ -38,11 +50,13 @@ Setup account:
 
 Run:
 
-    ./widdly -http :1337 -acc user.lst -db /path/to/the/database
+    ./widdly -http :1337 -acc user.lst -db /path/to/the/database -gz 5
 
 - `-http :1337` - listen on port 1337 (by default port 8080 on localhost)
 - `-acc user.lst` - user list file.
 - `-db /path/to/the/database` - explicitly specify which file to use for the database (by default `widdly.db` in the current directory)
+- `-dbt flatFile` - database type: flatFile, bbolt, sqlite; use `-dbt ''` to list all
+- `-gz 5` - gzip compress level (1~9), 0 for disable, -1 for golang default
 
 
 ## Different between 'Save' button and TiddlyWeb's ajax sync

@@ -46,8 +46,8 @@ var (
 func InitHandle(mux *Mux) {
 	mux.HandleFunc("/", withLogging(index))
 	mux.HandleFunc("/status", withLogging(status))
-	mux.HandleFunc("/challenge/tiddlywebplugins.tiddlyspace.cookie_form", login) // POST, user=ee&password=11&tiddlyweb_redirect=%2Fstatus
-	mux.HandleFunc("/logout", logout) // POST
+	mux.HandleFunc("/challenge/tiddlywebplugins.tiddlyspace.cookie_form", withLogging(login)) // POST, user=ee&password=11&tiddlyweb_redirect=%2Fstatus
+	mux.HandleFunc("/logout", withLogging(logout)) // POST
 	mux.HandleFunc("/recipes/all/tiddlers.json", withLogging(list))
 	mux.HandleFunc("/recipes/all/tiddlers/", withLogging(tiddler))
 	mux.HandleFunc("/bags/bag/tiddlers/", withLogging(remove))

@@ -65,17 +65,8 @@ func checkExt(pathS string, ext string) []string {
 	return files
 }
 
-// MustOpen opens the BoltDB file specified as dataSource,
-// creates the necessary buckets and returns a TiddlerStore.
-// MustOpen panics if there is an error.
-func MustOpen(dataSource string) store.TiddlerStore {
-	s, err := Open(dataSource)
-	if err != nil {
-	    panic(err)
-	}
-	return s
-}
-
+// Open opens the flatFile path specified as dataSource,
+// creates the necessary directory and returns a TiddlerStore.
 func Open(dataSource string) (store.TiddlerStore, error) {
 	storePath := filepath.Join(".", dataSource)
 	tiddlersPath := filepath.Join(storePath, "tiddlers")
