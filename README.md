@@ -16,14 +16,14 @@ Go 1.7+
 
 ## TODO
 
-- [ ] `$:/DefaultTiddlers` loaded but not show up
+- [ ] `$:/DefaultTiddlers` loaded but not show up, might be cause by `$:/StoryList`
 - [x] add authorization back
 - [ ] multiple TiddlyWiki in subpath/suburl
 - [ ] ACL: login for read & edit, login for edit, all can edit
 - [x] check user/pass in file/db
 - [ ] fix api_test.go & add more test
 - [ ] set max keeping history revisions
-- [ ] send base html with gzip
+- [x] send base html with gzip
 - [ ] set backend type without re-compile
 
 
@@ -47,19 +47,20 @@ Run:
 
 |                                      | Save only [1]                | TiddlyWeb only                                                        | TiddlyWeb and Save [2]      |
 |--------------------------------------|------------------------------|-----------------------------------------------------------------------|-----------------------------|
-| can install plugin                   | yes [3]                      | no, need update base file                                             | yes [4]                     |
+| can install plugin                   | yes [3]                      | no, need update base file                                             | yes [4], click 'Save'       |
 | update sending size                  | big, full html file (~2MB)   | little (~ tiddler's size)                                             | little, except click 'Save' |
 | load tiddlers/configs from base file | once when page opened        | same as 'Save only'                                                   | same as 'Save only'         |
-| load tiddlers/configs by ajax        | no                           | yes, can override base file values                                    | same as 'TiddlyWeb only'    |
-| save tiddlers/configs into base file | yes                          | no                                                                    | yes [4]                     |
+| load tiddlers/configs by ajax        | no                           | yes, can override base file values [5]                                | same as 'TiddlyWeb only'    |
+| save tiddlers/configs into base file | yes                          | no                                                                    | yes [4], click 'Save'       |
 | save tiddlers/configs by ajax        | no                           | yes                                                                   | yes                         |
-| loading timing                       | all in once when page opened | tiddlers in base file when page opened and then load others with ajax | same as 'TiddlyWeb only'    |
+| loading timing                       | all in once when page opened | data in base file when page opened and then load others with ajax     | same as 'TiddlyWeb only'    |
 
 
 - [1] base on WebDAV
 - [2] this implement
 - [3] need to disable all authorization in current implement, or use WebDAV method
-- [4] by using WebDAV
+- [4] by using WebDAV (need login), cause a full upload of base file
+- [5] `$:/StoryList` not work :(
 
 
 ## TiddlyWiki base image

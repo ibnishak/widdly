@@ -128,7 +128,9 @@ func index(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	ServeBase(w, r)
+	gzw := TryGzipResponse(w, r)
+	defer gzw.Close()
+	ServeBase(gzw, r)
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +224,9 @@ func list(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(tiddlers)
+	gzw := TryGzipResponse(w, r)
+	defer gzw.Close()
+	err = json.NewEncoder(gzw).Encode(tiddlers)
 	if err != nil {
 		log.Println("ERR", err)
 	}
@@ -245,7 +249,13 @@ func getTiddler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
+	if len(data) > 1024 {
+		gzw := TryGzipResponse(w, r)
+		defer gzw.Close()
+		gzw.Write(data)
+	} else {
+		w.Write(data)
+	}
 }
 
 // putTiddler saves a tiddler.
