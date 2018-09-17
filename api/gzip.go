@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	GzipLevel = 5 // DefaultCompression (-1), BestSpeed (1), BestCompression (9)
+	GzipLevel = 5 // disable = 0, DefaultCompression = -1, BestSpeed = 1, BestCompression = 9
 )
 
 type GzipResponseWriter struct {
@@ -59,7 +59,7 @@ func CanAcceptsGzip(r *http.Request) (bool) {
 }
 
 func TryGzipResponse(w http.ResponseWriter, r *http.Request) (*GzipResponseWriter) {
-	if !CanAcceptsGzip(r) {
+	if !CanAcceptsGzip(r) || GzipLevel == 0 {
 		return &GzipResponseWriter{w, nil}
 	}
 

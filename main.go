@@ -39,8 +39,12 @@ import (
 )
 
 var (
+	VERSION = "SELFBUILD" // injected by buildflags
+
 	addr       = flag.String("http", "127.0.0.1:8080", "HTTP service address")
 	dataSource = flag.String("db", "widdly.db", "Database path/file")
+
+	gziplv   = flag.Int("gz", 1, "gzip compress level")
 
 	accounts   = flag.String("acc", "user.lst", "user list file")
 	// eache line : <user>\t<salt>\t<sha256(pwd)>
@@ -84,6 +88,8 @@ func main() {
 	// Open the data store and tell HTTP handlers to use it.
 	api.StoreDb = store.MustOpen(*dataSource)
 
+	api.GzipLevel = *gziplv
+
 	api.Authenticate = func(user string, pwd string) (bool) {
 		t0 := time.Now().Add(time.Second)
 		defer time.Sleep(time.Until(t0)) // prevent brute force & timing attacks
@@ -99,6 +105,9 @@ func main() {
 		}
 		return false
 	}
+
+	fmt.Println("[server] version =", VERSION)
+	fmt.Println("[server] gzip level =", *gziplv)
 
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }

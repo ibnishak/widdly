@@ -12,7 +12,9 @@ Go 1.7+
 
     $ git clone --depth=1 https://github.com/cs8425/widdly.git
     $ cd widdly
-    $ go build .
+    $ go build . # build
+    or
+    $ ./build_all.sh # build multi-arch executable binary to bin/widdly.*
 
 ## TODO
 
