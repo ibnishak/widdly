@@ -11,7 +11,7 @@
 // You should have received a copy of the GNU General Public License along
 // with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Package bolt is a BoltDB TiddlerStore backend.
+// Package sqlite is a SQLite3 TiddlerStore backend.
 package sqlite
 
 import (
@@ -50,7 +50,8 @@ func Open(dataSource string) (store.TiddlerStore, error) {
 		return nil, err
 	}
 	initStmt := `
-		CREATE TABLE IF NOT EXISTS tiddler (id integer not null primary key AUTOINCREMENT, title text, meta text, content text, revision integer);
+		CREATE TABLE IF NOT EXISTS tiddler (id integer not null primary key AUTOINCREMENT, title text NOT NULL UNIQUE, meta text, content BLOB, revision integer);
+		CREATE TABLE IF NOT EXISTS tiddler_history (id integer not null primary key AUTOINCREMENT, title text NOT NULL, meta text, content BLOB, revision integer);
 	`
 	_, err = db.Exec(initStmt)
 	if err != nil {
@@ -61,7 +62,7 @@ func Open(dataSource string) (store.TiddlerStore, error) {
 
 // Get retrieves a tiddler from the store by key (title).
 func (s *sqliteStore) Get(_ context.Context, key string) (*store.Tiddler, error) {
-	getStmt, err := s.db.Prepare(`SELECT meta, content FROM tiddler WHERE title = ? ORDER BY revision DESC LIMIT 1`)
+	getStmt, err := s.db.Prepare(`SELECT meta, content FROM tiddler WHERE title = ?`)
 	var meta string
 	var content string
 	err = getStmt.QueryRow(key).Scan(&meta, &content)
@@ -81,7 +82,7 @@ func copyOf(p []byte) []byte {
 // Special tiddlers (like global macros) are returned fat.
 func (s *sqliteStore) All(_ context.Context) ([]*store.Tiddler, error) {
 	tiddlers := make([]*store.Tiddler, 0)
-	rows, err := s.db.Query(`SELECT meta, content FROM tiddler`)
+	rows, err := s.db.Query(`SELECT meta, content FROM tiddler`) // TODO: [fix] only latest revision of each title
 	defer rows.Close()
 	for rows.Next() {
 		var meta string
@@ -107,7 +108,7 @@ func (s *sqliteStore) All(_ context.Context) ([]*store.Tiddler, error) {
 
 func getLastRevision(db *sql.DB, mkey string) int {
 	var revision int
-	getStmt, err := db.Prepare(`SELECT revision FROM tiddler WHERE title = ? ORDER BY revision DESC LIMIT 1`)
+	getStmt, err := db.Prepare(`SELECT revision FROM tiddler WHERE title = ?`)
 	err = getStmt.QueryRow(mkey).Scan(&revision)
 	if err == nil {
 		return 1
@@ -119,7 +120,7 @@ func getLastRevision(db *sql.DB, mkey string) int {
 // The tiddler is also written to the tiddler_history bucket.
 func (s *sqliteStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error) {
 	rev := getLastRevision(s.db, tiddler.Key)
-	insertStmt, err := s.db.Prepare(`INSERT INTO tiddler(title, meta, content, revision) VALUES (?, ?, ?, ?)`)
+	insertStmt, err := s.db.Prepare(`INSERT INTO tiddler(title, meta, content, revision) VALUES (?, ?, ?, ?) ON CONFLICT(title) DO UPDATE SET meta = ?, content = ?, revision = ?`)
 	if err != nil {
 		return 0, err
 	}
@@ -131,16 +132,38 @@ func (s *sqliteStore) Put(ctx context.Context, tiddler store.Tiddler) (int, erro
 		return 0, err
 	}
 
-	_, err = insertStmt.Exec(tiddler.Key, meta, text, rev+1)
+	_, err = insertStmt.Exec(tiddler.Key, meta, text, rev+1, meta, text, rev+1)
 	if err != nil {
 		return 0, err
 	}
+
+	// skip Draft history
+	if !tiddler.IsDraft {
+		insertStmt, err := s.db.Prepare(`INSERT INTO tiddler_history(title, meta, content, revision) VALUES (?, ?, ?, ?)`)
+		if err != nil {
+			return 0, err
+		}
+		_, err = insertStmt.Exec(tiddler.Key, meta, text, rev+1)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	return rev, nil
 }
 
 // Delete deletes a tiddler with the given key (title) from the store.
 func (s *sqliteStore) Delete(ctx context.Context, key string) error {
 	deleteStmt, err := s.db.Prepare(`DELETE FROM tiddler WHERE title = ?`)
+	if err != nil {
+		return err
+	}
+	_, err = deleteStmt.Exec(key)
+	if err != nil {
+		return err
+	}
+
+	deleteStmt, err = s.db.Prepare(`DELETE FROM tiddler_history WHERE title = ?`)
 	if err != nil {
 		return err
 	}
