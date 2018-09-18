@@ -12,7 +12,7 @@ Go 1.7+
 
 get source
 
-    $ git clone --depth=1 https://github.com/cs8425/widdly.git # get source
+    $ git clone --depth=1 https://github.com/cs8425/widdly.git
     $ cd widdly
 
 (optional) get dependency
@@ -37,8 +37,11 @@ or
 - [x] check user/pass in file/db
 - [ ] fix api_test.go & add more test
 - [ ] set max keeping history revisions
+  - [ ] flat file
+  - [ ] bolt/bbolt
+  - [ ] sqlite
 - [x] send base html with gzip
-- [x] set backend type without re-compile
+- [x] select backend type without re-compile
 
 
 ## Usage
@@ -46,6 +49,7 @@ or
 Setup account:
 
     ./widdly -u <username> -p <password> > user.lst
+    ./widdly -u <username2> -p <password2> >> user.lst
 
 
 Run:
@@ -59,23 +63,23 @@ Run:
 - `-gz 5` - gzip compress level (1~9), 0 for disable, -1 for golang default
 
 
-## Different between 'Save' button and TiddlyWeb's ajax sync
+## Different between PutSaver, TiddlyWeb and both enable
 
-|                                      | Save only [1]                | TiddlyWeb only                                                        | TiddlyWeb and Save [2]      |
+|                                      | PutSaver only [1]            | TiddlyWeb only                                                        | TiddlyWeb and PutSaver [2]  |
 |--------------------------------------|------------------------------|-----------------------------------------------------------------------|-----------------------------|
 | can install plugin                   | yes [3]                      | no, need update base file                                             | yes [4], click 'Save'       |
 | update sending size                  | big, full html file (~2MB)   | little (~ tiddler's size)                                             | little, except click 'Save' |
 | load tiddlers/configs from base file | once when page opened        | same as 'Save only'                                                   | same as 'Save only'         |
 | load tiddlers/configs by ajax        | no                           | yes, can override base file values [5]                                | same as 'TiddlyWeb only'    |
-| save tiddlers/configs into base file | yes                          | no                                                                    | yes [4], click 'Save'       |
+| save tiddlers/configs into base file | yes [3][4]                   | no                                                                    | yes [4], click 'Save'       |
 | save tiddlers/configs by ajax        | no                           | yes                                                                   | yes                         |
 | loading timing                       | all in once when page opened | data in base file when page opened and then load others with ajax     | same as 'TiddlyWeb only'    |
 
 
 - [1] base on WebDAV
 - [2] this implement
-- [3] need to disable all authorization in current implement, or use WebDAV method
-- [4] by using WebDAV (need login), cause a full upload of base file
+- [3] need to disable all authorization in current implement (modify code), or use other WebDAV server
+- [4] by using PutSaver (WebDAV), need login, cause a full upload of base file
 - [5] `$:/StoryList` not work :(
 
 

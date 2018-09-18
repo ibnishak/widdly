@@ -32,6 +32,7 @@ const (
 // sqliteStore is a sqliteDB store for tiddlers.
 type sqliteStore struct {
 	db *sql.DB
+	maxRev int
 }
 
 func init() {
@@ -55,7 +56,7 @@ func Open(dataSource string) (store.TiddlerStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &sqliteStore{db}, nil
+	return &sqliteStore{db, -1}, nil
 }
 
 // Get retrieves a tiddler from the store by key (title).
@@ -149,3 +150,8 @@ func (s *sqliteStore) Delete(ctx context.Context, key string) error {
 	}
 	return nil
 }
+
+func (s *sqliteStore) SetMaxHistory(rev int) {
+	s.maxRev = rev
+}
+

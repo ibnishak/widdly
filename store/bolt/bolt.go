@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	bolt "go.etcd.io/bbolt"
 
@@ -32,6 +33,7 @@ const (
 // boltStore is a BoltDB store for tiddlers.
 type boltStore struct {
 	db *bolt.DB
+	maxRev int
 }
 
 func init() {
@@ -62,7 +64,7 @@ func Open(dataSource string) (store.TiddlerStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &boltStore{db}, nil
+	return &boltStore{db, -1}, nil
 }
 
 // Get retrieves a tiddler from the store by key (title).
@@ -119,9 +121,32 @@ func getLastRevision(b *bolt.Bucket, mkey []byte) int {
 	var meta struct{ Revision int }
 	data := b.Get(mkey)
 	if data != nil && json.Unmarshal(data, &meta) == nil {
-		return meta.Revision + 1
+		return meta.Revision
 	}
 	return 1
+}
+
+// delete all revision <= rev
+func (s *boltStore) trimRevision(b *bolt.Bucket, key string, rev int) (err error) {
+	c := b.Cursor()
+	prefix := []byte(fmt.Sprintf("%s#", key))
+	for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+		idx := bytes.LastIndexByte(k, byte('#'))
+		if idx < 0 {
+			return
+		}
+
+		krev64, _ := strconv.ParseInt(string(k[idx+1:]), 10, 64)
+		krev := int(krev64)
+		if krev <= rev {
+			fmt.Printf("rm key=%s, rev=%d\n", k, krev)
+			err := b.Delete(k)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return
 }
 
 // Put saves tiddler to the store, incrementing and returning revision.
@@ -132,12 +157,16 @@ func (s *boltStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error)
 		b := tx.Bucket([]byte("tiddler"))
 		mkey := []byte(tiddler.Key + "|1")
 
-		rev = getLastRevision(b, mkey)
+		rev = getLastRevision(b, mkey) + 1
 		tiddler.Js["revision"] = rev
 
-		data, err := tiddler.MarshalJSON() // meta with text & rev
-		if err != nil {
-			return err
+		var data []byte
+		var err error
+		if s.maxRev != 0 && !tiddler.IsDraft { // skip Draft history
+			data, err = tiddler.MarshalJSON() // meta with text & rev
+			if err != nil {
+				return err
+			}
 		}
 
 		text, _ := tiddler.Js["text"].(string)
@@ -156,10 +185,17 @@ func (s *boltStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error)
 			return err
 		}
 
-		history := tx.Bucket([]byte("tiddler_history"))
-		err = history.Put([]byte(fmt.Sprintf("%s#%d", tiddler.Key, rev)), data)
-		if err != nil {
-			return err
+		// skip Draft history
+		if s.maxRev != 0 && !tiddler.IsDraft {
+			history := tx.Bucket([]byte("tiddler_history"))
+			if s.maxRev > 0 && rev > s.maxRev {
+				s.trimRevision(history, tiddler.Key, rev)
+			}
+
+			err = history.Put([]byte(fmt.Sprintf("%s#%d", tiddler.Key, rev)), data)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -178,17 +214,18 @@ func (s *boltStore) Delete(ctx context.Context, key string) error {
 
 		rev := getLastRevision(b, mkey)
 
-		err := b.Put(mkey, nil)
+		err := b.Delete(mkey)
 		if err != nil {
 			return err
 		}
-		err = b.Put([]byte(key+"|2"), nil)
+		err = b.Delete([]byte(key+"|2"))
 		if err != nil {
 			return err
 		}
 
+		// remove all history
 		history := tx.Bucket([]byte("tiddler_history"))
-		err = history.Put([]byte(fmt.Sprintf("%s#%d", key, rev)), nil)
+		err = s.trimRevision(history, key, rev)
 		if err != nil {
 			return err
 		}
@@ -200,3 +237,8 @@ func (s *boltStore) Delete(ctx context.Context, key string) error {
 	}
 	return nil
 }
+
+func (s *boltStore) SetMaxHistory(rev int) {
+	s.maxRev = rev
+}
+

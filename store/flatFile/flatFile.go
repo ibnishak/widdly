@@ -36,6 +36,7 @@ type flatFileStore struct {
 	storePath string
 	tiddlersPath string
 	tiddlerHistoryPath string
+	maxRev int
 }
 
 func init() {
@@ -84,7 +85,7 @@ func Open(dataSource string) (store.TiddlerStore, error) {
 			return nil, err
 		}
 	}
-	return &flatFileStore{storePath, tiddlersPath, tiddlerHistoryPath}, nil
+	return &flatFileStore{storePath, tiddlersPath, tiddlerHistoryPath, -1}, nil
 }
 
 func key2File(key string) string {
@@ -145,9 +146,7 @@ func (s *flatFileStore) All(_ context.Context) ([]*store.Tiddler, error) {
 }
 
 func getLastRevision(s *flatFileStore, key string) int {
-	key = key2File(key)
 	rev := 1 // start with 1
-
 	tiddlerMetaPath := filepath.Join(s.tiddlersPath, key + ".meta")
 	if _, err := os.Stat(tiddlerMetaPath); os.IsNotExist(err) {
 		return rev
@@ -162,6 +161,19 @@ func getLastRevision(s *flatFileStore, key string) int {
 	}
 
 	return rev
+}
+
+func (s *flatFileStore) trimRevision(key string, rev int) {
+	tryRev := rev - s.maxRev
+	if tryRev <= 0 {
+		return
+	}
+
+	historyPath := filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, tryRev))
+	if _, err := os.Stat(historyPath); os.IsNotExist(err) {
+		return
+	}
+
 }
 
 // Put saves tiddler to the store, incrementing and returning revision.
@@ -189,10 +201,17 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 
 	// skip Draft history
 	if !tiddler.IsDraft {
-		data, err := tiddler.MarshalJSON()
-		err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, rev)), data, 0644)
-		if err != nil {
-			return rev, err
+		switch s.maxRev {
+		case 0: // disable
+		default: // > 0
+			s.trimRevision(key, rev)
+			fallthrough
+		case -1: // unlimit
+			data, err := tiddler.MarshalJSON()
+			err = ioutil.WriteFile(filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, rev)), data, 0644)
+			if err != nil {
+				return rev, err
+			}
 		}
 	}
 
@@ -228,3 +247,8 @@ func (s *flatFileStore) Delete(ctx context.Context, key string) error {
 	}
 	return nil
 }
+
+func (s *flatFileStore) SetMaxHistory(rev int) {
+	s.maxRev = rev
+}
+

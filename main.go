@@ -46,6 +46,7 @@ var (
 	dataType   = flag.String("dbt", "flatFile", "Database type")
 
 	gziplv   = flag.Int("gz", 1, "gzip compress level, 0 for disable")
+	rev   = flag.Int("rev", -1, "Max keeping history count, 0 for disable, -1 for unlimit")
 
 	accounts   = flag.String("acc", "user.lst", "user list file")
 	// eache line : <user>\t<salt>\t<sha256(pwd)>
@@ -70,6 +71,7 @@ func main() {
 
 	fmt.Println("[server] version =", VERSION)
 	fmt.Println("[server] gzip level =", *gziplv)
+	fmt.Println("[server] max history count =", *rev)
 
 	// read in accounts
 	af, err := os.Open(*accounts)
@@ -97,6 +99,7 @@ func main() {
 		fmt.Println("[backend list]", list)
 		return
 	}
+	db.SetMaxHistory(*rev)
 	api.StoreDb = db
 
 	api.GzipLevel = *gziplv
