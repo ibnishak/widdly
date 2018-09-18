@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"strconv"
 	"errors"
 )
 
@@ -76,19 +75,11 @@ func (t *Tiddler) MarshalJSON() ([]byte, error) {
 }
 
 func (t *Tiddler) GetRevision() (rev int) {
-	js := make(map[string]interface{})
-	err := json.Unmarshal(t.Meta, &js)
-	if err != nil {
-		return 0
+	var meta struct{ Revision int }
+	if json.Unmarshal(t.Meta, &meta) == nil {
+		return meta.Revision
 	}
-
-	revstr, ok := js["revision"].(string)
-	if ok {
-		rev64, _ := strconv.ParseInt(revstr, 10, 64)
-		rev = int(rev64)
-	}
-
-	return rev
+	return 1
 }
 
 

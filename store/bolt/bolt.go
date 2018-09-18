@@ -188,8 +188,8 @@ func (s *boltStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error)
 		// skip Draft history
 		if s.maxRev != 0 && !tiddler.IsDraft {
 			history := tx.Bucket([]byte("tiddler_history"))
-			if s.maxRev > 0 && rev > s.maxRev {
-				s.trimRevision(history, tiddler.Key, rev)
+			if s.maxRev > 0 && rev - s.maxRev > 1 {
+				s.trimRevision(history, tiddler.Key, rev - 1 - s.maxRev)
 			}
 
 			err = history.Put([]byte(fmt.Sprintf("%s#%d", tiddler.Key, rev)), data)
@@ -223,13 +223,17 @@ func (s *boltStore) Delete(ctx context.Context, key string) error {
 			return err
 		}
 
+		// skip Draft history
+		//if tiddler.IsDraft {
+		//	return nil
+		//}
+
 		// remove all history
 		history := tx.Bucket([]byte("tiddler_history"))
 		err = s.trimRevision(history, key, rev)
 		if err != nil {
 			return err
 		}
-
 		return nil
 	})
 	if err != nil {

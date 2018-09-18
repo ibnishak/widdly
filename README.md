@@ -37,8 +37,8 @@ or
 - [x] check user/pass in file/db
 - [ ] fix api_test.go & add more test
 - [ ] set max keeping history revisions
-  - [ ] flat file
-  - [ ] bolt/bbolt
+  - [x] flat file
+  - [x] bolt/bbolt
   - [ ] sqlite
 - [x] send base html with gzip
 - [x] select backend type without re-compile

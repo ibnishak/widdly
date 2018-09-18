@@ -159,21 +159,40 @@ func getLastRevision(s *flatFileStore, key string) int {
 		t, _ := store.NewTiddler(meta, nil)
 		rev = t.GetRevision()
 	}
-
 	return rev
 }
 
-func (s *flatFileStore) trimRevision(key string, rev int) {
-	tryRev := rev - s.maxRev
-	if tryRev <= 0 {
-		return
-	}
+// delete all revision <= rev
+func (s *flatFileStore) trimRevision(key string, rev int) (err error) {
+	fmt.Println("[trim]", key, rev)
+	maxDel := 10
+	maxMiss := 10
 
-	historyPath := filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#%d", key, tryRev))
-	if _, err := os.Stat(historyPath); os.IsNotExist(err) {
-		return
-	}
+	basePath := filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#", key))
+	for i := rev; i > 0; i -= 1 {
+		fpath := fmt.Sprintf("%s%d", basePath, i)
+		_, err = os.Stat(fpath)
+		if os.IsNotExist(err) {
+			maxMiss -= 1
+			if maxMiss == 0 {
+				return nil
+			}
+		}
 
+		if err == nil {
+			err = os.Remove(fpath)
+			fmt.Printf("rm key=%s, rev=%d, err= %v\n", fpath, i, err)
+			if err != nil {
+				return err
+			}
+
+			maxDel -= 1
+			if maxDel == 0 {
+				return nil
+			}
+		}
+	}
+	return
 }
 
 // Put saves tiddler to the store, incrementing and returning revision.
@@ -204,7 +223,9 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 		switch s.maxRev {
 		case 0: // disable
 		default: // > 0
-			s.trimRevision(key, rev)
+			if rev - s.maxRev > 1 {
+				s.trimRevision(key, rev - 1 - s.maxRev)
+			}
 			fallthrough
 		case -1: // unlimit
 			data, err := tiddler.MarshalJSON()
@@ -237,6 +258,7 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 // Delete deletes a tiddler with the given key (title) from the store.
 func (s *flatFileStore) Delete(ctx context.Context, key string) error {
 	key = key2File(key)
+	rev := getLastRevision(s, key)
 	err := os.Remove(filepath.Join(s.tiddlersPath, key + ".meta"))
 	if err != nil {
 		return err
@@ -245,6 +267,12 @@ func (s *flatFileStore) Delete(ctx context.Context, key string) error {
 	if err != nil {
 		return err
 	}
+
+	// skip Draft history
+	//if !tiddler.IsDraft {
+	//	s.trimRevision(key, rev)
+	//}
+	s.trimRevision(key, rev)
 	return nil
 }
 
