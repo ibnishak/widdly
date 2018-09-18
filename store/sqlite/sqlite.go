@@ -119,12 +119,13 @@ func getLastRevision(db *sql.DB, mkey string) int {
 // Put saves tiddler to the store, incrementing and returning revision.
 // The tiddler is also written to the tiddler_history bucket.
 func (s *sqliteStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error) {
-	rev := getLastRevision(s.db, tiddler.Key)
+	rev := getLastRevision(s.db, tiddler.Key) + 1
 	insertStmt, err := s.db.Prepare(`INSERT INTO tiddler(title, meta, content, revision) VALUES (?, ?, ?, ?) ON CONFLICT(title) DO UPDATE SET meta = ?, content = ?, revision = ?`)
 	if err != nil {
 		return 0, err
 	}
 
+	tiddler.Js["revision"] = rev
 	text, _ := tiddler.Js["text"].(string)
 	delete(tiddler.Js, "text")
 	meta, err := json.Marshal(tiddler.Js)
@@ -132,7 +133,7 @@ func (s *sqliteStore) Put(ctx context.Context, tiddler store.Tiddler) (int, erro
 		return 0, err
 	}
 
-	_, err = insertStmt.Exec(tiddler.Key, meta, text, rev+1, meta, text, rev+1)
+	_, err = insertStmt.Exec(tiddler.Key, meta, text, rev, meta, text, rev)
 	if err != nil {
 		return 0, err
 	}
@@ -143,7 +144,7 @@ func (s *sqliteStore) Put(ctx context.Context, tiddler store.Tiddler) (int, erro
 		if err != nil {
 			return 0, err
 		}
-		_, err = insertStmt.Exec(tiddler.Key, meta, text, rev+1)
+		_, err = insertStmt.Exec(tiddler.Key, meta, text, rev)
 		if err != nil {
 			return 0, err
 		}
