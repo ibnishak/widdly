@@ -18,6 +18,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"context"
 
 	"time"
 	"crypto/sha256"
@@ -27,6 +28,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"strings"
 	"encoding/csv"
 
@@ -99,9 +102,10 @@ func main() {
 		fmt.Println("[backend list]", list)
 		return
 	}
+	defer db.Close()
 	db.SetMaxHistory(*rev)
-	api.StoreDb = db
 
+	api.StoreDb = db
 	api.GzipLevel = *gziplv
 
 	api.Authenticate = func(user string, pwd string) (bool) {
@@ -120,9 +124,28 @@ func main() {
 		return false
 	}
 
-	log.Fatal(http.ListenAndServe(*addr, mux))
-}
+	srv := &http.Server{Addr: *addr, Handler: mux}
 
+	waitClosed := make(chan struct{})
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt, os.Kill, syscall.SIGTERM)
+		<-sigint
+
+		// We received an interrupt signal, shut down.
+		if err := srv.Shutdown(context.Background()); err != nil {
+			// Error from closing listeners, or context timeout:
+			log.Printf("HTTP server Shutdown: %v", err)
+		}
+		close(waitClosed)
+	}()
+
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		log.Printf("HTTP server ListenAndServe: %v", err)
+	}
+
+	<-waitClosed
+}
 
 type User struct {
 	UID            string

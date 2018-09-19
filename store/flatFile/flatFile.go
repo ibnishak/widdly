@@ -88,6 +88,10 @@ func Open(dataSource string) (store.TiddlerStore, error) {
 	return &flatFileStore{storePath, tiddlersPath, tiddlerHistoryPath, -1}, nil
 }
 
+func (s *flatFileStore) Close() error {
+	return nil
+}
+
 func key2File(key string) string {
 	illegalChar := `<>:"/\|?*^`
 	mapFn := func(r rune) rune {
@@ -164,9 +168,8 @@ func getLastRevision(s *flatFileStore, key string) int {
 
 // delete all revision <= rev
 func (s *flatFileStore) trimRevision(key string, rev int) (err error) {
-	fmt.Println("[trim]", key, rev)
-	maxDel := 10
-	maxMiss := 10
+	maxDel := s.maxRev + 1 // should <= rev
+	maxMiss := 1 // should <= rev
 
 	basePath := filepath.Join(s.tiddlerHistoryPath, fmt.Sprintf("%s#", key))
 	for i := rev; i > 0; i -= 1 {
@@ -174,14 +177,13 @@ func (s *flatFileStore) trimRevision(key string, rev int) (err error) {
 		_, err = os.Stat(fpath)
 		if os.IsNotExist(err) {
 			maxMiss -= 1
-			if maxMiss == 0 {
+			if maxMiss == 0 { // fast return when Revision no exist
 				return nil
 			}
 		}
 
 		if err == nil {
 			err = os.Remove(fpath)
-			fmt.Printf("rm key=%s, rev=%d, err= %v\n", fpath, i, err)
 			if err != nil {
 				return err
 			}
@@ -222,7 +224,7 @@ func (s *flatFileStore) Put(ctx context.Context, tiddler store.Tiddler) (int, er
 	if !tiddler.IsDraft {
 		switch s.maxRev {
 		case 0: // disable
-		default: // > 0
+		default: // > 0, remove old history
 			if rev - s.maxRev > 1 {
 				s.trimRevision(key, rev - 1 - s.maxRev)
 			}
@@ -268,10 +270,6 @@ func (s *flatFileStore) Delete(ctx context.Context, key string) error {
 		return err
 	}
 
-	// skip Draft history
-	//if !tiddler.IsDraft {
-	//	s.trimRevision(key, rev)
-	//}
 	s.trimRevision(key, rev)
 	return nil
 }

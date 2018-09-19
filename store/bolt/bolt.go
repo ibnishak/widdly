@@ -43,6 +43,12 @@ func init() {
 	}
 }
 
+func copyOf(p []byte) []byte {
+	q := make([]byte, len(p), len(p))
+	copy(q, p)
+	return q
+}
+
 // Open opens the BoltDB file specified as dataSource,
 // creates the necessary buckets and returns a TiddlerStore.
 func Open(dataSource string) (store.TiddlerStore, error) {
@@ -67,6 +73,13 @@ func Open(dataSource string) (store.TiddlerStore, error) {
 	return &boltStore{db, -1}, nil
 }
 
+func (s *boltStore) Close() error {
+	if s.db == nil {
+		return nil
+	}
+	return s.db.Close()
+}
+
 // Get retrieves a tiddler from the store by key (title).
 func (s *boltStore) Get(_ context.Context, key string) (*store.Tiddler, error) {
 	var meta []byte
@@ -77,7 +90,11 @@ func (s *boltStore) Get(_ context.Context, key string) (*store.Tiddler, error) {
 		if meta == nil {
 			return store.ErrNotFound
 		}
+		meta = copyOf(meta)
 		tiddler = b.Get([]byte(key + "|2"))
+		if tiddler != nil {
+			tiddler = copyOf(tiddler)
+		}
 		return nil
 	})
 	if err != nil {
@@ -103,10 +120,10 @@ func (s *boltStore) All(_ context.Context) ([]*store.Tiddler, error) {
 			var tiddler []byte
 			_, text := c.Next()
 			if bytes.Contains(meta, []byte(`"$:/tags/Macro"`)) {
-				tiddler = []byte(text)
+				tiddler = copyOf(text)
 			}
 
-			t, _ := store.NewTiddler(meta, tiddler)
+			t, _ := store.NewTiddler(copyOf(meta), tiddler)
 			tiddlers = append(tiddlers, t)
 		}
 		return nil
@@ -139,7 +156,6 @@ func (s *boltStore) trimRevision(b *bolt.Bucket, key string, rev int) (err error
 		krev64, _ := strconv.ParseInt(string(k[idx+1:]), 10, 64)
 		krev := int(krev64)
 		if krev <= rev {
-			fmt.Printf("rm key=%s, rev=%d\n", k, krev)
 			err := b.Delete(k)
 			if err != nil {
 				return err
@@ -162,7 +178,7 @@ func (s *boltStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error)
 
 		var data []byte
 		var err error
-		if s.maxRev != 0 && !tiddler.IsDraft { // skip Draft history
+		if s.maxRev != 0 && !tiddler.IsDraft && !tiddler.IsSys { // skip Draft & system key history
 			data, err = tiddler.MarshalJSON() // meta with text & rev
 			if err != nil {
 				return err
@@ -185,9 +201,11 @@ func (s *boltStore) Put(ctx context.Context, tiddler store.Tiddler) (int, error)
 			return err
 		}
 
-		// skip Draft history
-		if s.maxRev != 0 && !tiddler.IsDraft {
+		// skip Draft & system key history
+		if s.maxRev != 0 && !tiddler.IsDraft && !tiddler.IsSys {
 			history := tx.Bucket([]byte("tiddler_history"))
+
+			// remove old history
 			if s.maxRev > 0 && rev - s.maxRev > 1 {
 				s.trimRevision(history, tiddler.Key, rev - 1 - s.maxRev)
 			}
@@ -222,11 +240,6 @@ func (s *boltStore) Delete(ctx context.Context, key string) error {
 		if err != nil {
 			return err
 		}
-
-		// skip Draft history
-		//if tiddler.IsDraft {
-		//	return nil
-		//}
 
 		// remove all history
 		history := tx.Bucket([]byte("tiddler_history"))

@@ -102,6 +102,9 @@ type TiddlerStore interface {
 	// Delete deletes a tiddler by key.
 	Delete(ctx context.Context, key string) error
 
+	// Safety close backend.
+	Close() error
+
 	// Max keeping history count
 	// -1 => unlimit
 	// 0 => disable

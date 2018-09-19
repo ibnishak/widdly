@@ -6,7 +6,7 @@ for a personal [TiddlyWiki](http://tiddlywiki.com/).
 
 ## Requirements
 
-Go 1.7+
+Go 1.8+
 
 ## Build
 
@@ -36,9 +36,13 @@ or
 - [ ] ACL: login for read & edit, login for edit, all can edit
 - [x] check user/pass in file/db
 - [ ] fix api_test.go & add more test
-- [ ] set max keeping history revisions
+- [x] set max keeping history revisions
   - [x] flat file
   - [x] bolt/bbolt
+  - [x] sqlite
+- [ ] reduce history revisions size
+  - [ ] flat file
+  - [ ] bolt/bbolt
   - [ ] sqlite
 - [x] send base html with gzip
 - [x] select backend type without re-compile
@@ -54,13 +58,14 @@ Setup account:
 
 Run:
 
-    ./widdly -http :1337 -acc user.lst -db /path/to/the/database -gz 5
+    ./widdly -http :1337 -acc user.lst -db /path/to/the/database -gz 5 -rev 3
 
 - `-http :1337` - listen on port 1337 (by default port 8080 on localhost)
 - `-acc user.lst` - user list file.
 - `-db /path/to/the/database` - explicitly specify which file to use for the database (by default `widdly.db` in the current directory)
 - `-dbt flatFile` - database type: flatFile, bbolt, sqlite; use `-dbt ''` to list all
 - `-gz 5` - gzip compress level (1~9), 0 for disable, -1 for golang default
+- `-rev 3` - max keeping history count, 0 for disable, -1 for unlimit; `-rev n`, which n >= 1 will use more n+1 disk space, total size = size_of(tiddler) * (n + 2)
 
 
 ## Different between PutSaver, TiddlyWeb and both enable
