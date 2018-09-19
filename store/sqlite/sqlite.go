@@ -47,10 +47,14 @@ func init() {
 func Open(dataSource string) (store.TiddlerStore, error) {
 	// open url: _journal_mode
 	// SQL: PRAGMA journal_mode = DELETE | TRUNCATE | MEMORY | WAL
+	// reduce disk IO for sdcard/NAND(rpi, router etc) : MEMORY > WAL, TRUNCATE, DELETE
+	// more disk IO for safety : WAL > TRUNCATE
 	// https://www.sqlite.org/pragma.html#pragma_journal_mode
 
 	// open url: _synchronous
 	// SQL: PRAGMA synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
+	// with UPS: OFF, 0
+	// more safety but without UPS: EXTRA, 3 > FULL, 2
 	// https://www.sqlite.org/pragma.html#pragma_synchronous
 	db, err := sql.Open("sqlite3", dataSource + "?_journal_mode=WAL")
 	if err != nil {

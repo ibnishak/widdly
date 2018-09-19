@@ -28,25 +28,6 @@ or
 
     $ ./build_all.sh # build multi-arch executable binary to bin/widdly.*
 
-## TODO
-
-- [ ] `$:/DefaultTiddlers` loaded but not show up, might be cause by `$:/StoryList`
-- [x] add authorization back
-- [ ] multiple TiddlyWiki in subpath/suburl
-- [ ] ACL: login for read & edit, login for edit, all can edit
-- [x] check user/pass in file/db
-- [ ] fix api_test.go & add more test
-- [x] set max keeping history revisions
-  - [x] flat file
-  - [x] bolt/bbolt
-  - [x] sqlite
-- [ ] reduce history revisions size
-  - [ ] flat file
-  - [ ] bolt/bbolt
-  - [ ] sqlite
-- [x] send base html with gzip
-- [x] select backend type without re-compile
-
 
 ## Usage
 
@@ -64,8 +45,8 @@ Run:
 - `-acc user.lst` - user list file.
 - `-db /path/to/the/database` - explicitly specify which file to use for the database (by default `widdly.db` in the current directory)
 - `-dbt flatFile` - database type: flatFile, bbolt, sqlite; use `-dbt ''` to list all
-- `-gz 5` - gzip compress level (1~9), 0 for disable, -1 for golang default
-- `-rev 3` - max keeping history count, 0 for disable, -1 for unlimit; `-rev n`, which n >= 1 will use more n+1 disk space, total size = size_of(tiddler) * (n + 2)
+- `-gz 5` - gzip compress level (1~9), 0 for disable, -1 for golang default level
+- `-rev n` - max keeping history count, 0 for disable, -1 for unlimit; which n >= 1 will use more n+1 disk space, total size = size_of(tiddler) * (n + 2)
 
 
 ## Different between PutSaver, TiddlyWeb and both enable
@@ -117,3 +98,31 @@ The process for preparing a new index.html is:
 ## Similar projects
 
 For a Google App Engine TiddlyWiki server, look at [rsc/tiddly](https://github.com/rsc/tiddly).
+
+
+## SQLite backend
+There are some tweaking option for the trade off between disk IO and data safety, edit `Open()` function in `store/sqlite/sqlite.go` for your use case and re-compile the code.
+Default option are `journal_mode = WAL` and `synchronous = NORMAL`.
+
+
+## TODO
+
+- [ ] `$:/DefaultTiddlers` loaded but not show up, might be cause by `$:/StoryList`
+- [x] add authorization back
+- [ ] multiple TiddlyWiki in subpath/suburl
+- [ ] ACL: login for read & edit, login for edit, all can edit
+- [x] check user/pass in file/db
+- [ ] fix api_test.go & add more test
+- [x] set max keeping history revisions
+  - [x] flat file
+  - [x] bolt/bbolt
+  - [x] sqlite
+- [ ] reduce history revisions size
+  - [ ] flat file
+  - [ ] bolt/bbolt
+  - [ ] sqlite
+- [x] send base html with gzip
+- [x] select backend type without re-compile
+- [ ] https server
+
+
