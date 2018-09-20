@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"log"
+	"crypto/tls"
 	"net/http"
 	"context"
 
@@ -47,6 +48,9 @@ var (
 	addr       = flag.String("http", "127.0.0.1:8080", "HTTP service address")
 	dataSource = flag.String("db", "widdly.db", "Database path/file")
 	dataType   = flag.String("dbt", "flatFile", "Database type")
+
+	crtFile    = flag.String("crt", "", "PEM eoncoded certificate file")
+	keyFile    = flag.String("key", "", "PEM encoded private key file")
 
 	gziplv   = flag.Int("gz", 1, "gzip compress level, 0 for disable")
 	rev   = flag.Int("rev", -1, "Max keeping history count, 0 for disable, -1 for unlimit")
@@ -132,7 +136,7 @@ func main() {
 		signal.Notify(sigint, os.Interrupt, os.Kill, syscall.SIGTERM)
 		<-sigint
 
-		// We received an interrupt signal, shut down.
+		// received an interrupt signal, shutdown.
 		if err := srv.Shutdown(context.Background()); err != nil {
 			// Error from closing listeners, or context timeout:
 			log.Printf("HTTP server Shutdown: %v", err)
@@ -140,11 +144,47 @@ func main() {
 		close(waitClosed)
 	}()
 
-	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		log.Printf("HTTP server ListenAndServe: %v", err)
+	startServer(srv)
+
+	<-waitClosed // block until server shutdown
+}
+
+func startServer(srv *http.Server) {
+	var err error
+
+	// check tls
+	if *crtFile != "" && *keyFile != "" {
+		cfg := &tls.Config{
+			MinVersion:               tls.VersionTLS12,
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, // http/2 must
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, // http/2 must
+
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384, // weak
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA, // waek
+			},
+		}
+		srv.TLSConfig = cfg
+		//srv.TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0) // disable http/2
+
+		err = srv.ListenAndServeTLS(*crtFile, *keyFile)
+	} else {
+		err = srv.ListenAndServe()
 	}
 
-	<-waitClosed
+	if err != http.ErrServerClosed {
+		log.Printf("HTTP server ListenAndServe: %v", err)
+	}
 }
 
 type User struct {

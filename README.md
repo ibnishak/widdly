@@ -47,6 +47,7 @@ Run:
 - `-dbt flatFile` - database type: flatFile, bbolt, sqlite; use `-dbt ''` to list all
 - `-gz 5` - gzip compress level (1~9), 0 for disable, -1 for golang default level
 - `-rev n` - max keeping history count, 0 for disable, -1 for unlimit; which n >= 1 will use more n+1 disk space, total size = size_of(tiddler) * (n + 2)
+- `-crt <crt.pem>`, `-key <key.pem>` - PEM eoncoded certificate file and private key file for HTTPS server, fill empty (default) for HTTP server
 
 
 ## Different between PutSaver, TiddlyWeb and both enable
@@ -60,6 +61,7 @@ Run:
 | save tiddlers/configs into base file | yes [3][4]                   | no                                                                    | yes [4], click 'Save'       |
 | save tiddlers/configs by ajax        | no                           | yes                                                                   | yes                         |
 | loading timing                       | all in once when page opened | data in base file when page opened and then load others with ajax     | same as 'TiddlyWeb only'    |
+| Export all tiddlers                  | yes, at any time             | yes, but tiddlers must be loaded, otherwise will only have title      | same as 'TiddlyWeb only'    |
 
 
 - [1] base on WebDAV
@@ -67,6 +69,10 @@ Run:
 - [3] need to disable all authorization in current implement (modify code), or use other WebDAV server
 - [4] by using PutSaver (WebDAV), need login, cause a full upload of base file
 - [5] `$:/StoryList` not work :(
+
+
+## Important about "Export all"
+All **tiddlers MUST be loaded** and then do a export, otherwise the tiddlers which did not loaded will only have title!!
 
 
 ## TiddlyWiki base image
@@ -124,5 +130,8 @@ Default option are `journal_mode = WAL` and `synchronous = NORMAL`.
 - [x] send base html with gzip
 - [x] select backend type without re-compile
 - [ ] https server
+  - [ ] generate TLS certificate
+  - [x] serve in https
+  - [ ] auto let's encrypt certificate
 
 
