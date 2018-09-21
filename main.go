@@ -244,8 +244,8 @@ func genCert(crtPath string, keyPath string) {
 	tmpl := &x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"TiddlyWiki","cs8425/widdly"},
-			//CommonName: "cs8425/widdly",
+			Organization: []string{"cs8425/widdly"},
+			CommonName: "TiddlyWiki",
 		},
 		NotBefore: time.Now(),
 		NotAfter: time.Now().AddDate(10, 0, 0), // 10 years
