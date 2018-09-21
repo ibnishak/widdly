@@ -37,6 +37,11 @@ Setup account:
     ./widdly -u <username2> -p <password2> >> user.lst
 
 
+Generate self-sign TLS EC Certificate & Key (optional):
+
+    ./widdly -genkey -crt <server.crt> -key <server-priv.key>
+
+
 Run:
 
     ./widdly -http :1337 -acc user.lst -db /path/to/the/database -gz 5 -rev 3
@@ -47,7 +52,8 @@ Run:
 - `-dbt flatFile` - database type: flatFile, bbolt, sqlite; use `-dbt ''` to list all
 - `-gz 5` - gzip compress level (1~9), 0 for disable, -1 for golang default level
 - `-rev n` - max keeping history count, 0 for disable, -1 for unlimit; which n >= 1 will use more n+1 disk space, total size = size_of(tiddler) * (n + 2)
-- `-crt <crt.pem>`, `-key <key.pem>` - PEM eoncoded certificate file and private key file for HTTPS server, fill empty (default) for HTTP server
+- `-crt <crt.pem>`, `-key <key.pem>` - PEM encoded certificate file and private key file for HTTPS server, fill empty (default) for HTTP server
+- `-genkey` - set with non-empty `-crt` and `-key` for generate new TLS certificate, will override the file set with `-crt <crt.pem>` and `-key <key.pem>`
 
 
 ## Different between PutSaver, TiddlyWeb and both enable
@@ -130,7 +136,7 @@ Default option are `journal_mode = WAL` and `synchronous = NORMAL`.
 - [x] send base html with gzip
 - [x] select backend type without re-compile
 - [ ] https server
-  - [ ] generate TLS certificate
+  - [x] generate TLS certificate
   - [x] serve in https
   - [ ] auto let's encrypt certificate
 

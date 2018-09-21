@@ -15,24 +15,32 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"io/ioutil"
+
 	"flag"
 	"log"
-	"crypto/tls"
-	"net/http"
+	"bufio"
 	"context"
-
-	"time"
+	"crypto/tls"
 	"crypto/sha256"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"strings"
-	"encoding/csv"
+	"time"
+
 
 	"./api"
 	"./store"
@@ -49,14 +57,15 @@ var (
 	dataSource = flag.String("db", "widdly.db", "Database path/file")
 	dataType   = flag.String("dbt", "flatFile", "Database type")
 
-	crtFile    = flag.String("crt", "", "PEM eoncoded certificate file")
+	crtFile    = flag.String("crt", "", "PEM encoded certificate file")
 	keyFile    = flag.String("key", "", "PEM encoded private key file")
+	genKey     = flag.Bool("genkey", false, "generate self-sign EC certificate")
 
 	gziplv   = flag.Int("gz", 1, "gzip compress level, 0 for disable")
 	rev   = flag.Int("rev", -1, "Max keeping history count, 0 for disable, -1 for unlimit")
 
 	accounts   = flag.String("acc", "user.lst", "user list file")
-	// eache line : <user>\t<salt>\t<sha256(pwd)>
+	// eache line end with '\n': <user>\t<salt>\t<sha256(pwd)>
 	// comment start with '#'
 
 	user   = flag.String("u", "", "encode user name to user.lst format")
@@ -76,6 +85,13 @@ func main() {
 		return
 	}
 
+	if *genKey && *crtFile != "" && *keyFile != "" {
+		fmt.Println("generate self-sign EC certificate...", *crtFile, *keyFile)
+		genCert(*crtFile, *keyFile)
+		fmt.Println("generate finish")
+		return
+	}
+
 	fmt.Println("[server] version =", VERSION)
 	fmt.Println("[server] gzip level =", *gziplv)
 	fmt.Println("[server] max history count =", *rev)
@@ -92,7 +108,7 @@ func main() {
 		fmt.Println("[Parse Accounts error]", *accounts, err)
 		return
 	}
-
+	fmt.Println("[user] count =", len(userlist))
 
 
 	mux := api.NewRootMux()
@@ -131,8 +147,8 @@ func main() {
 	srv := &http.Server{Addr: *addr, Handler: mux}
 
 	waitClosed := make(chan struct{})
+	sigint := make(chan os.Signal, 1)
 	go func() {
-		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt, os.Kill, syscall.SIGTERM)
 		<-sigint
 
@@ -146,6 +162,11 @@ func main() {
 
 	startServer(srv)
 
+	select {
+	case <-sigint:
+	default:
+		close(sigint)
+	}
 	<-waitClosed // block until server shutdown
 }
 
@@ -161,15 +182,20 @@ func startServer(srv *http.Server) {
 			CipherSuites: []uint16{
 
 				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-
 				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
 				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 
 				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, // http/2 must
 				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, // http/2 must
 
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
 				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+
 				tls.TLS_RSA_WITH_AES_256_GCM_SHA384, // weak
 				tls.TLS_RSA_WITH_AES_256_CBC_SHA, // waek
 			},
@@ -187,6 +213,64 @@ func startServer(srv *http.Server) {
 	}
 }
 
+func genCert(crtPath string, keyPath string) {
+	//key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	if err != nil {
+		log.Fatalf("Failed to generate ECDSA key: %s\n", err)
+	}
+
+	keyDer, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		log.Fatalf("Failed to serialize ECDSA key: %s\n", err)
+	}
+
+	keyPem := pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: keyDer,
+	})
+	err = ioutil.WriteFile(keyPath, keyPem, 0600)
+	if err != nil {
+		log.Fatalf("Failed to write '%s': %s", keyPath, err)
+	}
+
+
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 64)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		log.Fatalf("failed to generate serial number:", err)
+	}
+
+	tmpl := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"TiddlyWiki","cs8425/widdly"},
+			//CommonName: "cs8425/widdly",
+		},
+		NotBefore: time.Now(),
+		NotAfter: time.Now().AddDate(10, 0, 0), // 10 years
+		//BasicConstraintsValid: true,
+		//IsCA: true,
+		//KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment, // | x509.KeyUsageCertSign
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+
+	certDer, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		log.Fatalf("Failed to create certificate: %s\n", err)
+	}
+
+	crtPem := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certDer,
+	})
+	err = ioutil.WriteFile(crtPath, crtPem, 0600)
+	if err != nil {
+		log.Fatalf("Failed to write '%s': %s", crtPath, err)
+	}
+
+}
+
 type User struct {
 	UID            string
 	Salt           string
@@ -196,61 +280,18 @@ type User struct {
 func readTSV(input io.ReadCloser) (map[string]*User, error) {
 	defer input.Close()
 
-	reader := csv.NewReader(input)
-	reader.Comma = '\t' // Use tab-delimited instead of comma
-	reader.FieldsPerRecord = -1
-
-	list := make(map[string]*User)
-	for idx := 0; ; idx++ {
-		row, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			fmt.Println("[csv parse error]", err)
-			return nil, err
-		}
-
-		//Vln(5, idx, row[0], row[0] != "")
-
-		if len(row) < 3 {
-			continue
-		}
-
-		if row[0] == "" {
-			continue
-		}
-		if strings.HasPrefix(row[0], "#") {
-			continue
-		}
-
-		uid := row[0]
-		salt := row[1]
-		hash := row[2]
-
-		list[uid] = &User{
-			UID: uid,
-			Salt: salt,
-			Hash: hash,
-		}
-
-	}
-
-	return list, nil
-}
-
-/*func readTSV(input io.ReadCloser) (map[string]*User, error) {
-	defer input.Close()
-
 	list := make(map[string]*User)
 	r := bufio.NewReader(input)
 	for {
 		line, err := r.ReadString('\n')
-		if err != nil && err != io.EOF {
-			break
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
 		}
 
-		row := strings.Split(strings.Trim(line, "\n"), "\t")
+		row := strings.Split(strings.TrimRight(line, "\r\n"), "\t")
 		if len(row) < 3 {
 			continue
 		}
@@ -272,7 +313,9 @@ func readTSV(input io.ReadCloser) (map[string]*User, error) {
 			Hash: hash,
 		}
 	}
-}*/
+
+	return list, nil
+}
 
 func generateRandomBytes(n int) ([]byte, error) {
 	b := make([]byte, n)
