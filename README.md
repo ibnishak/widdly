@@ -36,11 +36,11 @@ will be prompted to save the updated index.html.
 
 ## Changing the storage engine
 
-Currently the only way to chnage the storage engine is to chnage line 40 in main.go to import a different storage engine and re-build the default is sqlite but you can also use:
+Currently the only way to change the storage engine is to change line 40 in main.go to import a different storage engine and re-build. The default is sqlite but you can also use:
 
 - _ "./store/flatfile" 
 - _ "./store/sqlite"
-_ "./store/bolt"
+- _ "./store/bolt"
 
 ## Similar projects
 
